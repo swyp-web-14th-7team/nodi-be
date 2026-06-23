@@ -8,6 +8,105 @@ datasource db {
   provider = "mysql"
 }
 
+// -------------- 유저 --------------
 model User {
+  id       String @id @default(ulid()) @db.Char(26)
+  name     String @db.VarChar(255) // 실제 본명 (소셜 로그인 시 딸려오는 이름)
+  nickname String @db.VarChar(255) // 서비스에서 사용할 닉네임
+  email    String @unique @db.VarChar(255) // 소셜 로그인 이메일 (중복 불가)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt DateTime? @map("deleted_at") @db.DateTime(3) // 소프트 딜리드 시점, 소프트 딜리트 시 email 을 뭉개어 개인정보를 보호한다.
+
+  auths         UserAuth[]
+  refreshTokens RefreshToken[]
+  cards         ProfileCard[]
+  collections   ProfileCardCollection[]
+
+  @@map("users")
+}
+
+model UserAuth {
+  id         Int    @id @default(autoincrement()) @db.UnsignedInt
+  provider   String @db.VarChar(20) // google, ...
+  providerId String @map("provider_id") @db.VarChar(255)
+
+  userId String @map("user_id") @db.Char(26)
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  @@unique([userId, provider])
+  @@unique([provider, providerId])
+  @@map("user_auths")
+}
+
+model RefreshToken {
+  id       Int    @id @default(autoincrement()) @db.UnsignedInt
+  deviceId String @map("device_id") @db.Char(26)
+  token    String @db.Char(64) // refreshToken 의 sha256 해시값
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  revokedAt DateTime? @map("revoked_at") @db.DateTime(3)
+
+  userId String @map("user_id") @db.Char(26)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, deviceId])
+  @@map("refresh_tokens")
+}
+
+// -------------- 프로필 카드 --------------
+model ProfileCardTemplate {
+  id       Int    @id @default(autoincrement()) @db.UnsignedInt
+  htmlText String @map("html_text") @db.Text
+
+  cards ProfileCard[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@map("profile_card_templates")
+}
+
+model ProfileCard {
   id String @id @default(ulid()) @db.Char(26)
+
+  // 인자 (템플릿에 무관하게 공통된 필드들
+  name        String @db.VarChar(100)
+  description String @db.VarChar(2000)
+  jobTitle    String @map("job_title") @db.VarChar(100) // 직군 (백엔드, 프론트 엔트, PM 등등
+
+  templateParams Json? @map("template_params") // 탬플릿의 고유한 속성들
+
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  userId     String              @map("user_id") @db.Char(26)
+  user       User                @relation(fields: [userId], references: [id])
+  templateId Int                 @db.UnsignedInt
+  template   ProfileCardTemplate @relation(fields: [templateId], references: [id])
+
+  collections ProfileCardCollection[]
+
+  @@index([userId])
+  @@map("profile_cards")
+}
+
+// TODO: 스냅샷 문제 상의 필요. (ex: 내가 A 프로필 카드 저장한 후 A 가 수정되면 내가 저장한 프로필 카드도 수정되나? 삭제시에는?)
+// 현재는 함께 수정되는 버전
+model ProfileCardCollection {
+  userId String      @map("user_id") @db.Char(26)
+  user   User        @relation(fields: [userId], references: [id])
+  cardId String      @map("card_id") @db.Char(26)
+  card   ProfileCard @relation(fields: [cardId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  memo String? @db.VarChar(2000) // 저장한 프로필 카드에 대한 간단한 메모
+
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@id([userId, cardId])
+  @@map("profile_card_collections")
 }
