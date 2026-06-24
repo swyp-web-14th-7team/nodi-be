@@ -17,7 +17,7 @@ export class UsersService {
       data: {
         ...dto,
         ...(this.configService.get<string>('ADMIN_EMAIL') === dto.email && {
-          role: UserRole.Admin,
+          role: UserRole.ADMIN,
         }),
       },
     });
