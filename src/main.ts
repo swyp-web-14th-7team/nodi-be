@@ -3,9 +3,10 @@ import { AppModule } from './app/app.module';
 import { TransformInterceptor } from '@/common/interceptor/transform.interceptor';
 import cookieParser from 'cookie-parser';
 import { ValidationPipe } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.use(cookieParser());
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalPipes(
@@ -18,6 +19,7 @@ async function bootstrap() {
     origin: true, // 요청 origin 반영 (dev용). 운영에선 허용 도메인 명시 권장
     credentials: true, // 쿠키(device_id) 주고받기 허용
   });
+  app.useLogger(app.get(Logger));
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap().catch((err) => {

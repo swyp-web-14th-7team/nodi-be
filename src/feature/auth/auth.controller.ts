@@ -19,7 +19,7 @@ export class AuthController {
   private deviceIdCookieOptions(): CookieOptions {
     return {
       httpOnly: true,
-      secure: this.configService.get<string>('NODE_ENV') === 'prod',
+      secure: true,
       sameSite: 'none', // 프론트 != 백엔드 인 경우 none, 같은 경우 lax
       path: '/',
       maxAge: DEVICE_ID_MAX_AGE_MS,
