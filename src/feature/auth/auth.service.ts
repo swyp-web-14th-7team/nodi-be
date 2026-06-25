@@ -8,15 +8,33 @@ import { OauthGoogleService } from '@/lib/oauth/oauth-google.service';
 import { type LoginDto } from '@/feature/auth/dto/login.dto';
 import { User } from '@/prisma/client';
 import { LoginResponse } from '@/feature/auth/type/login-response.type';
+import { JwtService } from '@nestjs/jwt';
+import { JwtPayload } from '@/feature/auth/type/jwt-payload.type';
+import { createHash } from 'crypto';
+import { PrismaService } from '@/lib/prisma/prisma.service';
+import {
+  JwtAccessTokenExpires,
+  JwtRefreshTokenExpires,
+} from '@/common/constant/jwt';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 @Injectable()
 export class AuthService {
+  private readonly SECRET_KEY: string;
+  private readonly REFRESH_SECRET_KEY: string;
+
   constructor(
     private readonly usersService: UsersService,
     private readonly oauthGoogleService: OauthGoogleService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
-  ) {}
+    private readonly jwtService: JwtService,
+    private readonly prismaService: PrismaService,
+    @InjectPinoLogger(AuthService.name) private readonly logger: PinoLogger,
+  ) {
+    this.SECRET_KEY = configService.getOrThrow('JWT_SECRET');
+    this.REFRESH_SECRET_KEY = configService.getOrThrow('JWT_REFRESH_SECRET');
+  }
 
   async getGoogleAuthUrl(): Promise<string> {
     const state = randomUUID();
@@ -24,9 +42,41 @@ export class AuthService {
     return this.oauthGoogleService.getAuthUrl(state);
   }
 
-  private async generateToken() {}
+  private async generateToken(
+    userId: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const payload: JwtPayload = { sub: userId };
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        expiresIn: JwtAccessTokenExpires,
+        secret: this.SECRET_KEY,
+      }),
+      this.jwtService.signAsync(payload, {
+        expiresIn: JwtRefreshTokenExpires,
+        secret: this.REFRESH_SECRET_KEY,
+      }),
+    ]);
+    return { accessToken, refreshToken };
+  }
 
-  async login({ state, provider, code }: LoginDto): Promise<LoginResponse> {
+  async verifyTokenAsync(token: string, type: 'accessToken' | 'refreshToken') {
+    try {
+      return this.jwtService.verifyAsync<JwtPayload>(token, {
+        secret:
+          type === 'accessToken' ? this.SECRET_KEY : this.REFRESH_SECRET_KEY,
+      });
+    } catch {
+      throw new UnauthorizedException('유효하지 않거나 만료된 토큰입니다.');
+    }
+  }
+
+  private hashToken = (t: string) =>
+    createHash('sha256').update(t).digest('hex');
+
+  async login(
+    deviceId: string,
+    { state, provider, code }: LoginDto,
+  ): Promise<LoginResponse & { refreshToken: string }> {
     const cachedProvider: string | null = await this.redisService.get(
       `oauth:${state}`,
     );
@@ -44,8 +94,14 @@ export class AuthService {
       providerId: sub,
       name,
     });
-    // TODO: JWT 토큰 생성 및 발급
 
-    return { accessToken: '' };
+    const { accessToken, refreshToken } = await this.generateToken(user.id);
+    const hashedToken = this.hashToken(refreshToken);
+    await this.prismaService.refreshToken.upsert({
+      where: { userId_deviceId: { deviceId, userId: user.id } },
+      update: { token: hashedToken },
+      create: { deviceId, token: hashedToken, userId: user.id },
+    });
+    return { accessToken, refreshToken };
   }
 }

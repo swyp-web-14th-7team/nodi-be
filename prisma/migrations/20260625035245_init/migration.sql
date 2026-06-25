@@ -29,9 +29,10 @@ CREATE TABLE `user_auths` (
 -- CreateTable
 CREATE TABLE `refresh_tokens` (
     `id` INTEGER UNSIGNED NOT NULL AUTO_INCREMENT,
-    `device_id` CHAR(26) NOT NULL,
+    `device_id` CHAR(36) NOT NULL,
     `token` CHAR(64) NOT NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updated_at` DATETIME(3) NOT NULL,
     `revoked_at` DATETIME(3) NULL,
     `user_id` CHAR(26) NOT NULL,
 

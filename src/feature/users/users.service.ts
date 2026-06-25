@@ -20,7 +20,9 @@ export class UsersService {
   async findUnique(
     whereOptions: Prisma.UserWhereUniqueInput,
   ): Promise<User | null> {
-    return this.prismaService.user.findUnique({ where: whereOptions });
+    return this.prismaService.user.findUnique({
+      where: { ...whereOptions, deletedAt: null },
+    });
   }
 
   private async findUniqueByAuth(
@@ -28,7 +30,7 @@ export class UsersService {
   ): Promise<User | null> {
     const data: { user: User } | null =
       await this.prismaService.userAuth.findUnique({
-        where: whereOptions,
+        where: { ...whereOptions, user: { deletedAt: null } },
         select: { user: true },
       });
     return data?.user ?? null;
