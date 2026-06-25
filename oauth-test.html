@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OAuth 테스트 (Google)</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        max-width: 720px;
+        margin: 40px auto;
+        padding: 0 16px;
+        color: #1a1a1a;
+      }
+      h1 { font-size: 20px; }
+      .row { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
+      input[type='text'] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+      button {
+        padding: 10px 16px;
+        border: 0;
+        border-radius: 6px;
+        background: #4285f4;
+        color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button.secondary { background: #555; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      pre {
+        background: #0d1117;
+        color: #c9d1d9;
+        padding: 14px;
+        border-radius: 8px;
+        overflow: auto;
+        font-size: 13px;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+      .ok { background: #d4edda; color: #155724; }
+      .err { background: #f8d7da; color: #721c24; }
+      label { font-size: 13px; color: #555; }
+    </style>
+  </head>
+  <body>
+    <h1>🔐 Google OAuth 테스트</h1>
+
+    <div class="row">
+      <label style="width: 80px">API Base</label>
+      <input id="apiBase" type="text" value="http://localhost:3000" />
+    </div>
+
+    <div class="row">
+      <button id="loginBtn">① 구글 로그인 시작</button>
+      <button id="clearBtn" class="secondary">로그 지우기</button>
+    </div>
+
+    <p id="phase"></p>
+    <pre id="log">대기 중…</pre>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const apiBase = () => $('apiBase').value.replace(/\/+$/, '');
+      const PROVIDER = 'GOOGLE'; // Provider enum 값과 일치해야 함
+
+      const log = (msg, obj) => {
+        const time = new Date().toLocaleTimeString();
+        const body = obj !== undefined ? '\n' + JSON.stringify(obj, null, 2) : '';
+        $('log').textContent = `[${time}] ${msg}${body}\n\n` + $('log').textContent;
+      };
+      const phase = (html) => ($('phase').innerHTML = html);
+
+      // ① 로그인 시작: 백엔드에서 구글 인가 URL 받아 이동
+      $('loginBtn').onclick = async () => {
+        try {
+          phase('로그인 URL 요청 중…');
+          const res = await fetch(`${apiBase()}/auth/google`, {
+            method: 'GET',
+            credentials: 'include', // device_id 쿠키 주고받기
+          });
+          const json = await res.json();
+          log(`GET /auth/google → ${res.status}`, json);
+
+          // TransformInterceptor 래핑(data.url) / 비래핑(url) 둘 다 대응
+          const url = json?.data?.url ?? json?.url;
+          if (!url) throw new Error('응답에 url 이 없습니다');
+
+          phase('구글로 이동합니다…');
+          window.location.href = url;
+        } catch (e) {
+          phase('<span class="badge err">실패</span>');
+          log('로그인 시작 실패: ' + e.message);
+        }
+      };
+
+      $('clearBtn').onclick = () => ($('log').textContent = '대기 중…');
+
+      // ③ 콜백 처리: 구글이 ?code&state(또는 ?error)로 이 페이지에 돌아옴
+      (async function handleCallback() {
+        const q = new URLSearchParams(location.search);
+        const code = q.get('code');
+        const state = q.get('state');
+        const error = q.get('error');
+
+        if (error) {
+          phase('<span class="badge err">구글 에러</span>');
+          log('구글이 error 반환', { error, error_description: q.get('error_description') });
+          return;
+        }
+        if (!code) return; // 콜백이 아니라 그냥 첫 진입
+
+        log('콜백 수신', { code: code.slice(0, 12) + '…', state });
+        phase('백엔드로 code 교환 요청 중…');
+
+        try {
+          const res = await fetch(`${apiBase()}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ provider: PROVIDER, code, state }),
+          });
+          const json = await res.json();
+          log(`POST /auth/login → ${res.status}`, json);
+          phase(
+            res.ok
+              ? '<span class="badge ok">로그인 성공</span>'
+              : '<span class="badge err">로그인 실패 ' + res.status + '</span>',
+          );
+        } catch (e) {
+          phase('<span class="badge err">요청 실패</span>');
+          log('콜백 처리 실패: ' + e.message);
+        } finally {
+          // 새로고침 시 code 재사용(invalid_grant) 방지: 쿼리 제거
+          history.replaceState({}, '', location.pathname);
+        }
+      })();
+    </script>
+  </body>
+</html>
