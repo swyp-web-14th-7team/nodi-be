@@ -7,7 +7,6 @@ export class ResponseSuccess<T> {
   @ApiProperty()
   timestamp: Date;
 
-  @ApiProperty()
   data: T;
 
   constructor(data: T, status: number = 200) {

@@ -7,6 +7,13 @@ import { RolesGuard } from '@/common/guard/roles.guard';
 import { UserRole } from '@/common/enum/user-role.enum';
 import { Roles } from '@/common/decorator/roles.decorator';
 import { UserResponse } from '@/feature/users/type/user-response.type';
+import {
+  ApiBearerAuth,
+  ApiInternalServerErrorResponse,
+  ApiOperation,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { ApiResponseSuccess } from '@/common/decorator/api-response-success.decorator';
 
 @Controller('users')
 export class UsersController {
@@ -15,6 +22,11 @@ export class UsersController {
   @Get('me')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles([UserRole.USER])
+  @ApiOperation({ summary: '내 정보 조회' })
+  @ApiBearerAuth()
+  @ApiResponseSuccess(UserResponse)
+  @ApiUnauthorizedResponse()
+  @ApiInternalServerErrorResponse()
   getMe(@CurrentUser() user: User): UserResponse {
     return UserResponse.fromUser(user);
   }
