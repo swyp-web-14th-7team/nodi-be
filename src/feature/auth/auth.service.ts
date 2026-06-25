@@ -59,6 +59,17 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
+  async verifyTokenAsync(token: string, type: 'accessToken' | 'refreshToken') {
+    try {
+      return this.jwtService.verifyAsync<JwtPayload>(token, {
+        secret:
+          type === 'accessToken' ? this.SECRET_KEY : this.REFRESH_SECRET_KEY,
+      });
+    } catch {
+      throw new UnauthorizedException('유효하지 않거나 만료된 토큰입니다.');
+    }
+  }
+
   private hashToken = (t: string) =>
     createHash('sha256').update(t).digest('hex');
 
