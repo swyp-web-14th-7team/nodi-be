@@ -9,22 +9,29 @@ import { AuthService } from '@/feature/auth/auth.service';
 import { JwtPayload } from '@/feature/auth/type/jwt-payload.type';
 import { UsersService } from '@/feature/users/users.service';
 import { User } from '@/prisma/client';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
+  private readonly JWT_SECRET: string;
+
   constructor(
-    private readonly authService: AuthService,
     private readonly usersService: UsersService,
-  ) {}
+    readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
+  ) {
+    this.JWT_SECRET = configService.getOrThrow<string>('JWT_SECRET');
+  }
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req: Request = ctx.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromHeader(req);
     if (!token) throw new UnauthorizedException('인증 토큰이 없습니다');
 
-    const payload: JwtPayload = await this.authService.verifyTokenAsync(
+    const payload: JwtPayload = await this.jwtService.verifyAsync<JwtPayload>(
       token,
-      'accessToken',
+      { secret: this.JWT_SECRET },
     );
     const user: User | null = await this.usersService.findUnique({
       id: payload.sub,
