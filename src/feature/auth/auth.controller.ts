@@ -68,11 +68,9 @@ export class AuthController {
       | undefined;
     if (!deviceId) throw new BadRequestException('deviceId 가 필요합니다.');
 
-    const { accessToken, refreshToken } = await this.authService.login(
-      deviceId,
-      loginDto,
-    );
+    const { accessToken, tokenType, refreshToken } =
+      await this.authService.login(deviceId, loginDto);
     res.cookie(REFRESH_TOKEN_KEY, refreshToken, this.refreshTokenCookieOptions);
-    return { accessToken };
+    return { accessToken, tokenType };
   }
 }
