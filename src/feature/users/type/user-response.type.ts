@@ -1,24 +1,25 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from '@/prisma/client';
+import { FormattedDate } from '@/common/type/formatted-date.type';
 
 export class UserResponse {
-  @ApiProperty()
+  @ApiProperty({ description: '유저 ID' })
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: '유저 이름' })
   name: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: '유저 닉네임' })
   nickname: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'test@swyp.ts' })
   email: string;
 
   @ApiProperty()
-  createdAt: Date;
+  createdAt: FormattedDate;
 
   @ApiProperty()
-  updatedAt: Date;
+  updatedAt: FormattedDate;
 
   static fromUser(item: User): UserResponse {
     return {
@@ -26,8 +27,8 @@ export class UserResponse {
       name: item.name,
       nickname: item.nickname,
       email: item.email,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
+      createdAt: FormattedDate.fromDate(item.createdAt),
+      updatedAt: FormattedDate.fromDate(item.updatedAt),
     };
   }
 }

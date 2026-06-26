@@ -1,13 +1,17 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy, OnModuleInit {
   private client: Redis;
   private readonly redisUrl: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectPinoLogger(RedisService.name) private readonly logger: PinoLogger,
+  ) {
     const host = configService.get<string>('REDIS_HOST') ?? 'localhost';
     const port = configService.get<number>('REDIS_PORT') ?? 6379;
     const username = configService.get<string>('REDIS_USERNAME') ?? '';
@@ -23,19 +27,19 @@ export class RedisService implements OnModuleDestroy, OnModuleInit {
     this.redisUrl = `${host}:${port}`;
 
     this.client.on('error', (err) => {
-      console.error(`[RedisService] error: ${err}`);
+      this.logger.error(`RedisClient error: ${err.message}`);
     });
   }
 
   async onModuleDestroy() {
     await this.client.quit();
-    console.log(`[RedisService] Redis disconnected]`);
+    this.logger.info(`RedisClient disconnected`);
   }
 
   async onModuleInit() {
     await this.client.connect();
     await this.client.ping();
-    console.log(`[RedisService] Connected to Redis service ${this.redisUrl}`);
+    this.logger.info(`RedisClient connected to ${this.redisUrl}`);
   }
 
   // async hset(key: string, value: object) {

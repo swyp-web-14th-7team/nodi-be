@@ -10,7 +10,6 @@ import { UserResponse } from '@/feature/users/type/user-response.type';
 import {
   ApiBearerAuth,
   ApiInternalServerErrorResponse,
-  ApiOperation,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { ApiResponseSuccess } from '@/common/decorator/api-response-success.decorator';
@@ -19,10 +18,14 @@ import { ApiResponseSuccess } from '@/common/decorator/api-response-success.deco
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  /**
+   * 내 정보 조회
+   * @remarks 현재 로그인한 사용자의 프로필 정보를 반환합니다. User 이상의 역할이 필합니다.
+   * @param user
+   */
   @Get('me')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles([UserRole.USER])
-  @ApiOperation({ summary: '내 정보 조회' })
   @ApiBearerAuth()
   @ApiResponseSuccess(UserResponse)
   @ApiUnauthorizedResponse()
