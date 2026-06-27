@@ -1,0 +1,75 @@
+services:
+  backend_blue:
+    build: .
+    env_file:
+      - .env.deploy
+    deploy:
+      replicas: 2
+    expose: ["3000"]
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  backend_green:
+    build: .
+    env_file:
+      - .env.deploy
+    deploy:
+      replicas: 2
+    expose: ["3000"]
+    restart: unless-stopped
+    profiles: ["green"]
+    stop_grace_period: 30s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: be-nginx
+    ports: ["80:80"]
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/active:/etc/nginx/active:ro
+    restart: unless-stopped
+
+# ─────────────────────────────────────────────
+# 무중단 배포 (Blue-Green)
+#   - 현재색  = 지금 활성(트래픽 받는) 색
+#   - 다음색  = 배포할 반대 색 (stop 상태이거나 아직 없음)
+#   - 색 표기: blue ↔ green 핑퐁. 아래 명령에서 색 이름만 바꿔서 사용.
+#   - ★ profile 주의: green 은 항상 '--profile green' 필요, blue 는 불필요.
+#
+# [최초 1회] blue + nginx 기동
+#   docker compose up -d --build
+#
+# [배포]  새 코드를 "다음색"으로 올림 (예: 현재 green 활성 → blue 로 배포)
+# 1. 현재 활성 색 확인
+#   cat nginx/active/upstream.conf            # set $upstream backend_green:3000; → green 활성
+# 2. 다음색을 새 코드로 빌드·재생성  (★ start 아님! 항상 up --build)
+#   docker compose up -d --build backend_blue
+#   - stop 돼 있던(옛 코드) 다음색을 새 이미지로 갈아끼움. green 차례면:
+#       docker compose --profile green up -d --build backend_green
+# 3. ★ 다음색 헬스체크 (전환 전 필수! replica 전체 healthy 확인)
+#   docker compose ps                         # backend_blue 모두 (healthy) 될 때까지 대기
+#   - healthy 안 되면 전환하지 말고 다음색 제거 후 배포 취소:
+#       docker compose rm -sf backend_blue
+# 4. upstream 을 다음색으로 교체
+#   echo 'set $upstream backend_blue:3000;' > nginx/active/upstream.conf
+# 5. nginx reload (무중단 전환)
+#   docker compose exec nginx nginx -s reload
+# 6. 현재색(이제 이전색) 정지 — rm 하지 않고 stop (빠른 롤백 위해 보존)
+#   docker compose --profile green stop backend_green
+#   ※ 완료. 코드 문제는 배포 후 모니터링으로 발견 → 아래 롤백 사용
+#
+# [롤백]  배포 후 문제 발견 시, 직전 stop 된 색으로 복귀 (예: blue 활성 → green 복귀)
+# 1. 이전색 재가동  (★ up --build 아님! 옛 코드 그대로 start)
+#   docker compose --profile green start backend_green
+# 2. ★ 이전색 헬스체크 (재가동된 색이 healthy 될 때까지 대기)
+#   docker compose --profile green ps         # backend_green (healthy) 확인
+# 3. upstream 을 이전색으로 되돌림
+#   echo 'set $upstream backend_green:3000;' > nginx/active/upstream.conf
+# 4. nginx reload
+#   docker compose exec nginx nginx -s reload
+# 5. 문제 색(현재 활성이던 색) 정지
+#   docker compose stop backend_blue
+#
+# ※ 핵심 구분: 배포=up --build(새 코드) / 롤백=start(옛 코드 그대로)
+# ※ stop 된 이전색은 다음 배포 때 up --build 로 덮어써짐 = 직전 1버전만 롤백 가능
+# ─────────────────────────────────────────────
