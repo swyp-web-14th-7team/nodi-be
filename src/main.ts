@@ -4,6 +4,7 @@ import { TransformInterceptor } from '@/common/interceptor/transform.interceptor
 import cookieParser from 'cookie-parser';
 import { ValidationPipe } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -20,6 +21,18 @@ async function bootstrap() {
     credentials: true, // 쿠키(device_id) 주고받기 허용
   });
   app.useLogger(app.get(Logger));
+
+  const config = new DocumentBuilder()
+    .setTitle('프로필 카드 공유 서비스 API')
+    .setDescription('프로필 카드 공유 서비스 백엔드')
+    .setVersion(`${process.env.npm_package_version}`)
+    .addBearerAuth()
+    .addServer('http://localhost:3000', 'local')
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api-docs', app, document, { jsonDocumentUrl: 'docs' });
+
+  app.enableShutdownHooks();
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap().catch((err) => {

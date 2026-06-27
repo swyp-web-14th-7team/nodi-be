@@ -1,13 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiHideProperty, ApiProperty } from '@nestjs/swagger';
 
 export class ResponseSuccess<T> {
-  @ApiProperty({ description: '상태 코드' })
+  @ApiProperty({ description: '상태 코드 ' })
   status: number;
 
   @ApiProperty()
   timestamp: Date;
 
-  @ApiProperty()
+  @ApiHideProperty()
   data: T;
 
   constructor(data: T, status: number = 200) {

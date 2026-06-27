@@ -21,6 +21,7 @@ import 'dotenv/config';
       isGlobal: true,
     }),
     LoggerModule.forRoot({
+      assignResponse: true,
       pinoHttp: {
         level: process.env.NODE_ENV !== 'prod' ? 'debug' : 'info',
         transport:
@@ -40,13 +41,20 @@ import 'dotenv/config';
               id: req.id,
               method: req.method,
               url: req.url,
-              ...(process.env.NODE_ENV !== 'prod' && { headers: req.headers }),
+              ...(process.env.NODE_ENV !== 'prod' && {
+                headers: {
+                  authorization: req.headers.authorization,
+                },
+              }),
             };
           },
           res(res: SerializedResponse) {
             return { statusCode: res.statusCode, headers: res.headers };
           },
         },
+        ...(process.env.NODE_ENV === 'prod' && {
+          redact: ['req.headers.authorization', 'req.headers.cookie'],
+        }),
       },
     }),
     AuthModule,

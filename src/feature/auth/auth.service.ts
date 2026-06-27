@@ -102,6 +102,6 @@ export class AuthService {
       update: { token: hashedToken },
       create: { deviceId, token: hashedToken, userId: user.id },
     });
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, tokenType: 'Bearer' };
   }
 }

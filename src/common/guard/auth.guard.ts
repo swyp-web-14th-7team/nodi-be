@@ -5,12 +5,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { type Request } from 'express';
-import { AuthService } from '@/feature/auth/auth.service';
 import { JwtPayload } from '@/feature/auth/type/jwt-payload.type';
 import { UsersService } from '@/feature/users/users.service';
 import { User } from '@/prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -20,6 +20,7 @@ export class AuthGuard implements CanActivate {
     private readonly usersService: UsersService,
     readonly configService: ConfigService,
     private readonly jwtService: JwtService,
+    @InjectPinoLogger(AuthGuard.name) private readonly logger: PinoLogger,
   ) {
     this.JWT_SECRET = configService.getOrThrow<string>('JWT_SECRET');
   }
@@ -38,6 +39,7 @@ export class AuthGuard implements CanActivate {
     });
     if (!user) throw new UnauthorizedException('인증에 실패하였습니다.');
     req['user'] = user;
+    this.logger.assign({ user: { id: user.id, role: user.role } });
     return true;
   }
 
