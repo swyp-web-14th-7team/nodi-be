@@ -21,8 +21,13 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma/generated ./prisma/generated
 
-HEALTHCHECK --start-period=15s --start-interval=2s \
+HEALTHCHECK \
+    --start-period=15s \
+    --start-interval=2s \
+    --interval=10s \
+    --timeout=5s \
+    --retries=3 \
     CMD wget -qO- http://localhost:3000/health || exit 1
 
 EXPOSE 3000
-CMD ["npm", "run", "start:prod"]
+CMD ["node", "dist/src/main"]
