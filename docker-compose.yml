@@ -6,6 +6,9 @@ services:
     deploy:
       replicas: 2
     expose: ["3000"]
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     stop_grace_period: 30s
 
@@ -16,9 +19,27 @@ services:
     deploy:
       replicas: 2
     expose: ["3000"]
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     profiles: ["green"]
     stop_grace_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: be-redis
+    # AOF 영속화: 재시작해도 캐시/토큰 유지 (refresh token 등)
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    expose: ["6379"]            # 호스트에 노출 안 함. 백엔드만 내부망으로 접근
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
 
   nginx:
     image: nginx:1.27-alpine
@@ -28,6 +49,9 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/active:/etc/nginx/active:ro
     restart: unless-stopped
+
+volumes:
+  redis-data:        # Redis AOF 데이터 영속 볼륨
 
 # ─────────────────────────────────────────────
 # 무중단 배포 (Blue-Green)

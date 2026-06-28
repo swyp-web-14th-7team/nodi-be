@@ -6,15 +6,28 @@
     <title>OAuth 테스트 (Google)</title>
     <style>
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         max-width: 720px;
         margin: 40px auto;
         padding: 0 16px;
         color: #1a1a1a;
       }
-      h1 { font-size: 20px; }
-      .row { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
-      input[type='text'] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+      h1 {
+        font-size: 20px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin: 12px 0;
+      }
+      input[type='text'] {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
       button {
         padding: 10px 16px;
         border: 0;
@@ -24,8 +37,13 @@
         font-size: 14px;
         cursor: pointer;
       }
-      button.secondary { background: #555; }
-      button:disabled { opacity: 0.5; cursor: default; }
+      button.secondary {
+        background: #555;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
       pre {
         background: #0d1117;
         color: #c9d1d9;
@@ -36,10 +54,24 @@
         white-space: pre-wrap;
         word-break: break-all;
       }
-      .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
-      .ok { background: #d4edda; color: #155724; }
-      .err { background: #f8d7da; color: #721c24; }
-      label { font-size: 13px; color: #555; }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+      }
+      .ok {
+        background: #d4edda;
+        color: #155724;
+      }
+      .err {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      label {
+        font-size: 13px;
+        color: #555;
+      }
     </style>
   </head>
   <body>
@@ -47,7 +79,7 @@
 
     <div class="row">
       <label style="width: 80px">API Base</label>
-      <input id="apiBase" type="text" value="http://localhost:3000" />
+      <input id="apiBase" type="text" value="http://localhost:8080" />
     </div>
 
     <div class="row">
@@ -65,8 +97,10 @@
 
       const log = (msg, obj) => {
         const time = new Date().toLocaleTimeString();
-        const body = obj !== undefined ? '\n' + JSON.stringify(obj, null, 2) : '';
-        $('log').textContent = `[${time}] ${msg}${body}\n\n` + $('log').textContent;
+        const body =
+          obj !== undefined ? '\n' + JSON.stringify(obj, null, 2) : '';
+        $('log').textContent =
+          `[${time}] ${msg}${body}\n\n` + $('log').textContent;
       };
       const phase = (html) => ($('phase').innerHTML = html);
 
@@ -104,7 +138,10 @@
 
         if (error) {
           phase('<span class="badge err">구글 에러</span>');
-          log('구글이 error 반환', { error, error_description: q.get('error_description') });
+          log('구글이 error 반환', {
+            error,
+            error_description: q.get('error_description'),
+          });
           return;
         }
         if (!code) return; // 콜백이 아니라 그냥 첫 진입
