@@ -7,13 +7,12 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { AuthService } from '@/feature/auth/auth.service';
+import { AuthService } from '@/module/auth/auth.service';
 import type { CookieOptions, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
-import { LoginDto } from '@/feature/auth/dto/login.dto';
-import { ResponseSuccess } from '@/common/type/response-success.type';
-import { LoginResponse } from '@/feature/auth/type/login-response.type';
+import { LoginDto } from '@/module/auth/dto/login.dto';
+import { LoginResponse } from '@/module/auth/type/login-response.type';
 import { JwtRefreshTokenExpiresMs } from '@/common/constant/jwt';
 
 const DEVICE_ID_COOKIE_KEY: string = 'device_id';

@@ -5,8 +5,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { type Request } from 'express';
-import { JwtPayload } from '@/feature/auth/type/jwt-payload.type';
-import { UsersService } from '@/feature/users/users.service';
+import { JwtPayload } from '@/module/auth/type/jwt-payload.type';
+import { UsersService } from '@/module/users/users.service';
 import { User } from '@/prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';

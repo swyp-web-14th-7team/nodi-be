@@ -3,7 +3,7 @@ import { PrismaService } from '@/lib/prisma/prisma.service';
 import { type User } from '@/prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { UserRole } from '@/common/enum/user-role.enum';
-import { LoginParams } from '@/feature/users/type/login-params.type';
+import { LoginParams } from '@/module/users/type/login-params.type';
 import { Prisma } from '@/prisma/client';
 
 @Injectable()

@@ -1,15 +1,15 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { UsersService } from '@/feature/users/users.service';
+import { UsersService } from '@/module/users/users.service';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { RedisService } from '@/lib/redis/redis.service';
 import { Provider } from '@/common/enum/provider.enum';
 import { OauthGoogleService } from '@/lib/oauth/oauth-google.service';
-import { type LoginDto } from '@/feature/auth/dto/login.dto';
+import { type LoginDto } from '@/module/auth/dto/login.dto';
 import { User } from '@/prisma/client';
-import { LoginResponse } from '@/feature/auth/type/login-response.type';
+import { LoginResponse } from '@/module/auth/type/login-response.type';
 import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from '@/feature/auth/type/jwt-payload.type';
+import { JwtPayload } from '@/module/auth/type/jwt-payload.type';
 import { createHash } from 'crypto';
 import { PrismaService } from '@/lib/prisma/prisma.service';
 import {
@@ -26,10 +26,10 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly oauthGoogleService: OauthGoogleService,
-    private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly jwtService: JwtService,
     private readonly prismaService: PrismaService,
+    configService: ConfigService,
     @InjectPinoLogger(AuthService.name) private readonly logger: PinoLogger,
   ) {
     this.SECRET_KEY = configService.getOrThrow('JWT_SECRET');
