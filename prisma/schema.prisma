@@ -22,7 +22,7 @@ model User {
 
   auths         UserAuth[]
   refreshTokens RefreshToken[]
-  jobDetails    JobDetail[]
+  profileCards  UserProfileCard[]
 
   @@map("users")
 }
@@ -59,8 +59,8 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-// -------------- 직군 (기본 프로필 카드 정보) --------------
-model JobDetail {
+// -------------- 유저 프로필 카드 --------------
+model UserProfileCard {
   id       Int    @id @default(autoincrement()) @db.UnsignedInt
   nickname String @db.VarChar(255) // 프로필 카드 닉네임, 기본값은 user.name
 
@@ -74,11 +74,11 @@ model JobDetail {
   templateId Int?                 @map("template_id") @db.UnsignedInt
   template   ProfileCardTemplate? @relation(fields: [templateId], references: [id], onDelete: Restrict)
 
-  userSkills     JobSkill[]
-  userInterests  JobInterest[]
-  jobDetailItems JobDetailItem[]
+  profileCardSkills    ProfileCardSkill[]
+  profileCardInterests ProfileCardInterest[]
+  profileCardItems     ProfileCardItem[]
 
-  @@map("job_details")
+  @@map("user_profile_cards")
 }
 
 // -------------- 관심사 --------------
@@ -86,20 +86,20 @@ model Interest {
   id   Int    @id @default(autoincrement()) @db.UnsignedInt
   name String @unique @db.VarChar(100)
 
-  userInterests JobInterest[]
+  profileCardInterests ProfileCardInterest[]
 
   @@map("interests")
 }
 
-model JobInterest {
-  jobDetailId Int       @map("job_detail_id") @db.UnsignedInt
-  jobDetail   JobDetail @relation(fields: [jobDetailId], references: [id], onDelete: Cascade)
+model ProfileCardInterest {
+  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
+  profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id], onDelete: Cascade)
 
   interestId Int      @map("interest_id") @db.UnsignedInt
   interest   Interest @relation(fields: [interestId], references: [id], onDelete: Restrict)
 
-  @@id([jobDetailId, interestId])
-  @@map("user_interests")
+  @@id([profileCardId, interestId])
+  @@map("profile_card_interests")
 }
 
 // -------------- 유저 스킬 --------------
@@ -119,59 +119,59 @@ model Skill {
   categoryId Int           @map("category_id") @db.UnsignedInt
   category   SkillCategory @relation(fields: [categoryId], references: [id])
 
-  jobSkills JobSkill[]
+  profileCardSkills ProfileCardSkill[]
 
   @@map("skills")
 }
 
-model JobSkill {
-  jobDetailId Int       @map("job_detail_id") @db.UnsignedInt
-  jobDetail   JobDetail @relation(fields: [jobDetailId], references: [id], onDelete: Cascade)
+model ProfileCardSkill {
+  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
+  profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id], onDelete: Cascade)
 
   skillId Int   @map("skill_id") @db.UnsignedInt
   skill   Skill @relation(fields: [skillId], references: [id], onDelete: Restrict)
 
-  @@id([jobDetailId, skillId])
-  @@map("user_skills")
+  @@id([profileCardId, skillId])
+  @@map("profile_card_skills")
 }
 
-// 상세 탬플릿
-// 템플릿은 jobDetail 테이블에 JSON 형식으로 저장할 예정 -> jobDetailItem 에 저장
+// -------------- 프로필 카드 템플릿 --------------
+// 유저가 템플릿을 기반으로 프로필 카드를 만들면, 각 항목 값은 ProfileCardItem 에 저장된다
 model ProfileCardTemplate {
   id      Int    @id @default(autoincrement()) @db.UnsignedInt
   name    String @db.VarChar(255) // 직군명이 될 것! (백엔드 개발자 .. )
   version Int    @default(1) // 직군별 버전 탬플릿은 수정이 불가능함 (유저가 이미 사용중인경우) 이 경우에는 새 버전을 만드는 것으로 해결함
 
-  profileCardTemplateItems ProfileCardTemplateItemType[]
-  jobDetails               JobDetail[]
+  profileCardTemplateItems ProfileCardTemplateItem[]
+  profileCards             UserProfileCard[]
 
   @@unique([name, version])
   @@map("profile_card_templates")
 }
 
-model ProfileCardTemplateItemType {
+model ProfileCardTemplateItem {
   id          Int    @id @default(autoincrement()) @db.UnsignedInt
   label       String @db.VarChar(255) // 항목 이름
   description String @db.VarChar(2000) // 항목 설명
   type        Int    @db.TinyInt // 항목 타입 (0: SHORT_TEXT, 1: LONG_TEXT, 2: LINK, 3: NUMBER)
 
-  templateId     Int                 @db.UnsignedInt
-  template       ProfileCardTemplate @relation(fields: [templateId], references: [id])
-  jobDetailItems JobDetailItem[]
+  templateId       Int                 @map("template_id") @db.UnsignedInt
+  template         ProfileCardTemplate @relation(fields: [templateId], references: [id])
+  profileCardItems ProfileCardItem[]
 
-  @@map("profile_card_template_item_types")
+  @@map("profile_card_template_items")
 }
 
-model JobDetailItem {
+model ProfileCardItem {
   id    Int  @id @default(autoincrement()) @db.UnsignedInt
   value Json // 각 타입에 맞는 값
 
-  jobDetailId Int       @map("job_detail_id") @db.UnsignedInt
-  jobDetail   JobDetail @relation(fields: [jobDetailId], references: [id])
+  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
+  profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id])
 
-  itemTypeId Int                         @map("item_type_id") @db.UnsignedInt
-  itemType   ProfileCardTemplateItemType @relation(fields: [itemTypeId], references: [id])
+  templateItemId Int                     @map("template_item_id") @db.UnsignedInt
+  templateItem   ProfileCardTemplateItem @relation(fields: [templateItemId], references: [id])
 
-  @@unique([jobDetailId, itemTypeId])
-  @@map("job_detail_items")
+  @@unique([profileCardId, templateItemId])
+  @@map("profile_card_items")
 }
