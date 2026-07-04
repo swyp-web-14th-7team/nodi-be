@@ -1,0 +1,73 @@
+name: Build and Push Image (arm64)
+
+# main 에 push(=PR 머지) 될 때마다 arm64 이미지를 빌드해 GHCR 에 푸시
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # 필요 시 수동 실행
+
+# 같은 브랜치에서 새 push 오면 진행 중인 빌드는 취소
+concurrency:
+  group: build-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }} # 예: swyp-web-14th-7team/nodi-be
+
+jobs:
+  build-and-push:
+    # arm64 네이티브 러너 → QEMU 에뮬레이션 없이 빠르게 arm64 빌드
+    # (private repo 에서 arm 러너를 못 쓰는 플랜이면 runs-on: ubuntu-latest 로 바꾸고
+    #  아래 'Set up QEMU' 스텝 주석을 해제할 것)
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write # GHCR 푸시 권한
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # package.json 의 version 을 읽어 이미지 태그로 사용
+      - name: Read version from package.json
+        id: pkg
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # QEMU (에뮬레이션으로 arm64 빌드할 때만 필요 — 네이티브 arm 러너면 불필요)
+      # - name: Set up QEMU
+      #   uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # 별도 시크릿 불필요
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # latest + 커밋 SHA + package.json 버전 태그 부여
+          # (SHA 는 불변 핀용, latest 는 최신, 버전은 사람이 읽는 릴리스 식별)
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+            type=raw,value=v${{ steps.pkg.outputs.version }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # GitHub Actions 캐시로 레이어 재사용 → 빌드 속도 향상
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

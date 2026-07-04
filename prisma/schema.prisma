@@ -10,20 +10,22 @@ datasource db {
 
 // -------------- 유저 --------------
 model User {
-  id       String @id @default(ulid()) @db.Char(26)
-  name     String @db.VarChar(255) // 실제 본명 (소셜 로그인 시 딸려오는 이름)
-  nickname String @db.VarChar(255) // 서비스에서 사용할 닉네임
-  email    String @unique @db.VarChar(255) // 소셜 로그인 이메일 (중복 불가) 소프트 딜리트 시 deleted-{id}-{email} 형식으로 변경된다. TODO: 길이 초과되면 어떻할지 정하기!
-  role     Int    @default(0) @db.TinyInt // 0: 일반 유저, 1: ADMIN
+  id              String  @id @default(ulid()) @db.Char(26)
+  name            String  @db.VarChar(255) // 실제 본명 (소셜 로그인 시 딸려오는 이름)
+  nickname        String  @db.VarChar(255) // 서비스에서 사용할 닉네임
+  email           String  @unique @db.VarChar(255) // 소셜 로그인 이메일 (중복 불가) 소프트 딜리트 시 deleted-{id}-{email} 형식으로 변경된다. TODO: 길이 초과되면 어떻할지 정하기! -> 그냥 해시해서 저장하자!
+  profileImageUrl String? @map("profile_image_url") @db.VarChar(500)
+  role            Int     @default(0) @db.TinyInt // 0: 일반 유저, 1: ADMIN
 
   createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
   deletedAt DateTime? @map("deleted_at") @db.DateTime(3) // 소프트 딜리드 시점 (유저 정보는 일정기간 보관한다.)
 
-  auths         UserAuth[]
-  refreshTokens RefreshToken[]
-  cards         ProfileCard[]
-  collections   ProfileCardCollection[]
+  auths            UserAuth[]
+  refreshTokens    RefreshToken[]
+  profileCards     UserProfileCard[]
+  collections      UserCollection[]
+  collectionGroups CollectionGroup[]
 
   @@map("users")
 }
@@ -60,59 +62,191 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-// -------------- 프로필 카드 --------------
-model ProfileCardTemplate {
-  id       Int    @id @default(autoincrement()) @db.UnsignedInt
-  htmlText String @map("html_text") @db.Text
+// -------------- 직업 종류 --------------
+model JobType {
+  id                   Int                   @id @default(autoincrement()) @db.UnsignedInt
+  name                 String                @unique @db.VarChar(100) // 이 값은 수정할 수 없음. 다른게 필요하다면 새로 생성할 것.
+  personalities        Personality[]
+  profileCardTemplates ProfileCardTemplate[]
 
-  cards ProfileCard[]
+  @@map("job_types")
+}
+
+// -------------- 유저 프로필 카드 --------------
+model UserProfileCard {
+  id       Int    @id @default(autoincrement()) @db.UnsignedInt
+  nickname String @db.VarChar(255) // 프로필 카드 닉네임, 기본값은 user.name
+
+  userId String @map("user_id") @db.Char(26)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
-  // TODO: 삭제 정책 및 수정 정책
+  isActive  Boolean  @default(true) @map("is_active")
+  isDefault Boolean? @map("is_default")
 
+  templateId Int?                 @map("template_id") @db.UnsignedInt
+  template   ProfileCardTemplate? @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  profileCardSkills        ProfileCardSkill[]
+  profileCardInterests     ProfileCardInterest[]
+  profileCardItems         ProfileCardItem[]
+  profileCardPersonalities ProfileCardPersonality[]
+  userCollections          UserCollection[]
+
+  @@unique([userId, isDefault])
+  @@map("user_profile_cards")
+}
+
+// -------------- 관심사 --------------
+model Interest {
+  id   Int    @id @default(autoincrement()) @db.UnsignedInt
+  name String @unique @db.VarChar(100)
+
+  profileCardInterests ProfileCardInterest[]
+
+  @@map("interests")
+}
+
+model ProfileCardInterest {
+  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
+  profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id], onDelete: Cascade)
+
+  interestId Int      @map("interest_id") @db.UnsignedInt
+  interest   Interest @relation(fields: [interestId], references: [id], onDelete: Restrict)
+
+  @@id([profileCardId, interestId])
+  @@map("profile_card_interests")
+}
+
+// -------------- 유저 스킬 --------------
+model SkillCategory {
+  id   Int    @id @default(autoincrement()) @db.UnsignedInt
+  name String @unique @db.VarChar(100) // language, framwork, design tools ...
+
+  skills Skill[]
+
+  @@map("skill_categories")
+}
+
+model Skill {
+  id   Int    @id @default(autoincrement()) @db.UnsignedInt
+  name String @unique @db.VarChar(100)
+
+  categoryId Int           @map("category_id") @db.UnsignedInt
+  category   SkillCategory @relation(fields: [categoryId], references: [id])
+
+  profileCardSkills ProfileCardSkill[]
+
+  @@map("skills")
+}
+
+model ProfileCardSkill {
+  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
+  profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id], onDelete: Cascade)
+
+  skillId Int   @map("skill_id") @db.UnsignedInt
+  skill   Skill @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([profileCardId, skillId])
+  @@map("profile_card_skills")
+}
+
+// -------------- 개성 --------------
+model Personality {
+  id          Int    @id @default(autoincrement()) @db.UnsignedInt
+  name        String @unique @db.VarChar(100)
+  description String @db.VarChar(2000)
+
+  jobTypeId Int?     @map("job_type_id") @db.UnsignedInt // 관련 직군, null: 공통
+  jobType   JobType? @relation(fields: [jobTypeId], references: [id], onDelete: Restrict)
+
+  imageUrl String? @map("image_url") @db.VarChar(500)
+
+  profileCardPersonalities ProfileCardPersonality[]
+
+  @@map("personalities")
+}
+
+model ProfileCardPersonality {
+  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
+  profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id], onDelete: Cascade)
+
+  personalityId Int         @map("personality_id") @db.UnsignedInt
+  personality   Personality @relation(fields: [personalityId], references: [id], onDelete: Restrict)
+
+  @@id([profileCardId, personalityId])
+  @@map("profile_card_personalities")
+}
+
+// -------------- 프로필 카드 템플릿 --------------
+// 유저가 템플릿을 기반으로 프로필 카드를 만들면, 각 항목 값은 ProfileCardItem 에 저장된다
+model ProfileCardTemplate {
+  id Int @id @default(autoincrement()) @db.UnsignedInt
+
+  jobTypeId Int     @map("job_type_id") @db.UnsignedInt
+  jobType   JobType @relation(fields: [jobTypeId], references: [id], onDelete: Restrict)
+
+  version Int @default(1) // 직군별 버전 탬플릿은 수정이 불가능함 (유저가 이미 사용중인경우) 이 경우에는 새 버전을 만드는 것으로 해결함
+
+  profileCardTemplateItems ProfileCardTemplateItem[]
+  profileCards             UserProfileCard[]
+
+  @@unique([jobTypeId, version])
   @@map("profile_card_templates")
 }
 
-model ProfileCard {
-  id       String  @id @default(ulid()) @db.Char(26)
-  isPublic Boolean @default(false) @map("is_public")
+model ProfileCardTemplateItem {
+  id          Int    @id @default(autoincrement()) @db.UnsignedInt
+  label       String @db.VarChar(255) // 항목 이름
+  description String @db.VarChar(2000) // 항목 설명
+  type        Int    @db.TinyInt // 항목 타입 (0: SHORT_TEXT, 1: LONG_TEXT, 2: LINK, 3: NUMBER)
 
-  // 인자 (템플릿에 무관하게 공통된 필드들
-  name        String @db.VarChar(100)
-  description String @db.VarChar(2000)
-  jobTitle    String @map("job_title") @db.VarChar(100) // 직군 (백엔드, 프론트 엔트, PM 등등
+  templateId       Int                 @map("template_id") @db.UnsignedInt
+  template         ProfileCardTemplate @relation(fields: [templateId], references: [id])
+  profileCardItems ProfileCardItem[]
 
-  templateParams Json? @map("template_params") // 탬플릿의 고유한 속성들
-
-  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
-  // TODO: 삭제 정책 및 수정 정책
-
-  userId     String              @map("user_id") @db.Char(26)
-  user       User                @relation(fields: [userId], references: [id])
-  templateId Int                 @db.UnsignedInt
-  template   ProfileCardTemplate @relation(fields: [templateId], references: [id])
-
-  collections ProfileCardCollection[]
-
-  @@index([userId])
-  @@map("profile_cards")
+  @@map("profile_card_template_items")
 }
 
-// TODO: 스냅샷 문제 상의 필요. (ex: 내가 A 프로필 카드 저장한 후 A 가 수정되면 내가 저장한 프로필 카드도 수정되나? 삭제시에는?)
-// 현재는 함께 수정되는 버전
-model ProfileCardCollection {
-  userId String      @map("user_id") @db.Char(26)
-  user   User        @relation(fields: [userId], references: [id])
-  cardId String      @map("card_id") @db.Char(26)
-  card   ProfileCard @relation(fields: [cardId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+model ProfileCardItem {
+  id    Int  @id @default(autoincrement()) @db.UnsignedInt
+  value Json // 각 타입에 맞는 값
 
-  memo String? @db.VarChar(2000) // 저장한 프로필 카드에 대한 간단한 메모
+  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
+  profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  templateItemId Int                     @map("template_item_id") @db.UnsignedInt
+  templateItem   ProfileCardTemplateItem @relation(fields: [templateItemId], references: [id])
 
-  @@id([userId, cardId])
-  @@map("profile_card_collections")
+  @@unique([profileCardId, templateItemId])
+  @@map("profile_card_items")
+}
+
+// -------------- 스크랩 --------------
+model CollectionGroup {
+  id   Int    @id @default(autoincrement()) @db.UnsignedInt
+  name String @db.VarChar(100)
+
+  userId          String           @map("user_id") @db.Char(26)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userCollections UserCollection[]
+
+  @@unique([userId, name])
+  @@map("collection_groups")
+}
+
+model UserCollection {
+  id     Int    @id @default(autoincrement()) @db.UnsignedInt
+  userId String @map("user_id") @db.Char(26)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  groupId Int?             @map("group_id") @db.UnsignedInt
+  group   CollectionGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  cardId Int?             @map("card_id") @db.UnsignedInt
+  card   UserProfileCard? @relation(fields: [cardId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, groupId, cardId])
+  @@map("user_collections")
 }

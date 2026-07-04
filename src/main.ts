@@ -5,6 +5,9 @@ import cookieParser from 'cookie-parser';
 import { ValidationPipe } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { normalizeSuccessStatus } from '@/common/swagger/normalize-success-status';
+
+const port = process.env.PORT || 3000;
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -27,13 +30,14 @@ async function bootstrap() {
     .setDescription('프로필 카드 공유 서비스 백엔드')
     .setVersion(`${process.env.npm_package_version}`)
     .addBearerAuth()
-    .addServer('http://localhost:3000', 'local')
+    .addServer(`http://localhost:${port}`, 'local')
     .build();
   const document = SwaggerModule.createDocument(app, config);
+  normalizeSuccessStatus(document);
   SwaggerModule.setup('api-docs', app, document, { jsonDocumentUrl: 'docs' });
 
   app.enableShutdownHooks();
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(port);
 }
 bootstrap().catch((err) => {
   console.error('Fail to start application', err);
