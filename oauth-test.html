@@ -84,7 +84,19 @@
 
     <div class="row">
       <button id="loginBtn">① 구글 로그인 시작</button>
+      <button id="refreshBtn">② 토큰 refresh</button>
+      <button id="logoutBtn">③ 로그아웃</button>
       <button id="clearBtn" class="secondary">로그 지우기</button>
+    </div>
+
+    <div class="row">
+      <label style="width: 80px">Access Token</label>
+      <input
+        id="accessToken"
+        type="text"
+        readonly
+        placeholder="로그인/refresh 성공 시 표시"
+      />
     </div>
 
     <p id="phase"></p>
@@ -95,6 +107,32 @@
       const apiBase = () => $('apiBase').value.replace(/\/+$/, '');
       const PROVIDER = 'GOOGLE'; // Provider enum 값과 일치해야 함
 
+      // API Base 를 sessionStorage 에 저장해 OAuth 리다이렉트(페이지 새 로드) 후에도 유지
+      // 탭 닫으면 자동 삭제되고, 아래 TTL(1시간)로 만료도 처리
+      const API_BASE_TTL_MS = 60 * 60 * 1000; // 1시간
+      const setApiBase = (value) => {
+        const item = { value, expiresAt: Date.now() + API_BASE_TTL_MS };
+        sessionStorage.setItem('apiBase', JSON.stringify(item));
+      };
+      const getApiBase = () => {
+        const raw = sessionStorage.getItem('apiBase');
+        if (!raw) return null;
+        try {
+          const { value, expiresAt } = JSON.parse(raw);
+          if (Date.now() > expiresAt) {
+            sessionStorage.removeItem('apiBase'); // 만료 → 삭제
+            return null;
+          }
+          return value;
+        } catch {
+          return null;
+        }
+      };
+
+      const savedApiBase = getApiBase();
+      if (savedApiBase) $('apiBase').value = savedApiBase;
+      $('apiBase').oninput = () => setApiBase($('apiBase').value);
+
       const log = (msg, obj) => {
         const time = new Date().toLocaleTimeString();
         const body =
@@ -103,6 +141,27 @@
           `[${time}] ${msg}${body}\n\n` + $('log').textContent;
       };
       const phase = (html) => ($('phase').innerHTML = html);
+      const setAccessToken = (t) => {
+        if (t) $('accessToken').value = t;
+      };
+
+      // 쿠키(device_id, refresh_token) 기반 인증 엔드포인트 공통 호출
+      const postAuth = async (path, phaseMsg) => {
+        phase(phaseMsg);
+        const res = await fetch(`${apiBase()}${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        let json = null;
+        try {
+          json = await res.json();
+        } catch {
+          /* 바디 없는 응답(로그아웃 등) 무시 */
+        }
+        log(`POST ${path} → ${res.status}`, json);
+        return { res, json };
+      };
 
       // ① 로그인 시작: 백엔드에서 구글 인가 URL 받아 이동
       $('loginBtn').onclick = async () => {
@@ -124,6 +183,43 @@
         } catch (e) {
           phase('<span class="badge err">실패</span>');
           log('로그인 시작 실패: ' + e.message);
+        }
+      };
+
+      // ② 토큰 refresh: 쿠키의 refresh_token 으로 accessToken/refreshToken 갱신
+      $('refreshBtn').onclick = async () => {
+        try {
+          const { res, json } = await postAuth(
+            '/auth/refresh',
+            '토큰 refresh 요청 중…',
+          );
+          setAccessToken(json?.data?.accessToken ?? json?.accessToken);
+          phase(
+            res.ok
+              ? '<span class="badge ok">refresh 성공</span>'
+              : '<span class="badge err">refresh 실패 ' + res.status + '</span>',
+          );
+        } catch (e) {
+          phase('<span class="badge err">요청 실패</span>');
+          log('refresh 실패: ' + e.message);
+        }
+      };
+
+      // ③ 로그아웃: 서버에서 refresh_token 폐기(revoke)
+      $('logoutBtn').onclick = async () => {
+        try {
+          const { res } = await postAuth('/auth/logout', '로그아웃 요청 중…');
+          if (res.ok) $('accessToken').value = '';
+          phase(
+            res.ok
+              ? '<span class="badge ok">로그아웃 성공</span>'
+              : '<span class="badge err">로그아웃 실패 ' +
+                  res.status +
+                  '</span>',
+          );
+        } catch (e) {
+          phase('<span class="badge err">요청 실패</span>');
+          log('로그아웃 실패: ' + e.message);
         }
       };
 
@@ -158,6 +254,7 @@
           });
           const json = await res.json();
           log(`POST /auth/login → ${res.status}`, json);
+          setAccessToken(json?.data?.accessToken ?? json?.accessToken);
           phase(
             res.ok
               ? '<span class="badge ok">로그인 성공</span>'
