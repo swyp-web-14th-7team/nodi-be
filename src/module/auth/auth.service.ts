@@ -61,12 +61,16 @@ export class AuthService {
 
   async verifyTokenAsync(token: string, type: 'accessToken' | 'refreshToken') {
     try {
-      return this.jwtService.verifyAsync<JwtPayload>(token, {
-        secret:
-          type === 'accessToken' ? this.SECRET_KEY : this.REFRESH_SECRET_KEY,
-      });
+      const payload: JwtPayload = await this.jwtService.verifyAsync<JwtPayload>(
+        token,
+        {
+          secret:
+            type === 'accessToken' ? this.SECRET_KEY : this.REFRESH_SECRET_KEY,
+        },
+      );
+      return payload;
     } catch {
-      throw new UnauthorizedException('유효하지 않거나 만료된 토큰입니다.');
+      throw new UnauthorizedException(`유효하지 않은 ${type} 입니다.`);
     }
   }
 
@@ -83,6 +87,7 @@ export class AuthService {
     if (!cachedProvider || cachedProvider !== provider)
       throw new UnauthorizedException('유효하지 않거나 만료된 요청입니다.');
 
+    // TODO: provider 분기 코드 추가
     const payload = await this.oauthGoogleService.exchangeCode(code);
     const { sub, email, email_verified, name } = payload ?? {};
     if (!payload || !sub || !email || !email_verified || !name)
@@ -99,9 +104,60 @@ export class AuthService {
     const hashedToken = this.hashToken(refreshToken);
     await this.prismaService.refreshToken.upsert({
       where: { userId_deviceId: { deviceId, userId: user.id } },
-      update: { token: hashedToken },
+      update: { token: hashedToken, revokedAt: null },
       create: { deviceId, token: hashedToken, userId: user.id },
     });
     return { accessToken, refreshToken, tokenType: 'Bearer' };
+  }
+
+  async refresh(
+    deviceId: string,
+    token: string,
+  ): Promise<LoginResponse & { refreshToken: string }> {
+    const oldTokenPayload = await this.verifyTokenAsync(token, 'refreshToken');
+
+    const hashedOldToken = this.hashToken(token);
+    const oldToken: { user: User } | null =
+      await this.prismaService.refreshToken.findUnique({
+        where: {
+          deviceId_token: { deviceId, token: hashedOldToken },
+          revokedAt: null,
+        },
+        select: {
+          user: true,
+        },
+      });
+    if (!oldToken || oldToken.user.id !== oldTokenPayload.sub)
+      throw new UnauthorizedException('유효하지 않은 refresh 토큰입니다.');
+
+    const { accessToken, refreshToken } = await this.generateToken(
+      oldToken.user.id,
+    );
+    const hashedToken = this.hashToken(refreshToken);
+    await this.prismaService.refreshToken.update({
+      where: { userId_deviceId: { deviceId, userId: oldToken.user.id } },
+      data: { token: hashedToken },
+    });
+    return { accessToken, refreshToken, tokenType: 'Bearer' };
+  }
+
+  async logout(deviceId: string, token: string): Promise<void> {
+    const jwtPayload = await this.verifyTokenAsync(token, 'refreshToken');
+    const hashedToken = this.hashToken(token);
+
+    const user: User | null = await this.prismaService.user.findUnique({
+      where: { id: jwtPayload.sub },
+    });
+    if (!user)
+      throw new UnauthorizedException('유효하지 않은 refresh 토큰입니다.');
+
+    await this.prismaService.refreshToken.updateMany({
+      where: {
+        deviceId,
+        token: hashedToken,
+        userId: user.id,
+      },
+      data: { revokedAt: new Date() },
+    });
   }
 }

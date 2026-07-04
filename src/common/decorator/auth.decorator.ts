@@ -1,5 +1,9 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@/common/guard/auth.guard';
 import { RolesGuard } from '@/common/guard/roles.guard';
 import { Roles } from '@/common/decorator/roles.decorator';
@@ -16,6 +20,7 @@ export function Auth(...roles: UserRole[]) {
     Roles(roles),
     UseGuards(AuthGuard, RolesGuard),
     ApiBearerAuth(),
-    ApiUnauthorizedResponse(),
+    ApiUnauthorizedResponse({ description: '인증에 실패하였습니다.' }),
+    ApiForbiddenResponse({ description: '접근 권한이 없습니다.' }),
   );
 }

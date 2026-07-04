@@ -33,6 +33,7 @@ const isProd = process.env.NODE_ENV === 'prod';
                 headers: {
                   authorization: req.headers.authorization,
                 },
+                cookie: req.headers.cookie,
               }),
             };
           },
