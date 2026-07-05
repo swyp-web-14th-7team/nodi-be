@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class OauthGoogleService {
   private readonly client: OAuth2Client;
+  private readonly redirectPath: string;
 
   constructor(private readonly configService: ConfigService) {
     this.client = new OAuth2Client({
@@ -16,21 +17,27 @@ export class OauthGoogleService {
       clientSecret: this.configService.getOrThrow<string>(
         'GOOGLE_CLIENT_SECRET',
       ),
-      redirectUri: this.configService.getOrThrow<string>('GOOGLE_REDIRECT_URI'),
     });
+    this.redirectPath = this.configService.getOrThrow<string>(
+      'GOOGLE_REDIRECT_PATH',
+    );
   }
 
-  getAuthUrl(state: string): string {
+  getAuthUrl(state: string, origin: string): string {
     return this.client.generateAuthUrl({
       access_type: 'offline',
       scope: ['openid', 'email', 'profile'],
       state,
+      redirect_uri: `${origin}${this.redirectPath}`,
     });
   }
 
-  async exchangeCode(code: string) {
+  async exchangeCode(code: string, origin: string) {
     try {
-      const { tokens } = await this.client.getToken(code);
+      const { tokens } = await this.client.getToken({
+        code,
+        redirect_uri: `${origin}${this.redirectPath}`,
+      });
       const ticket = await this.client.verifyIdToken({
         idToken: tokens.id_token!,
         audience: this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID'),
