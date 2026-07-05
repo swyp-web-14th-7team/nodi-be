@@ -36,10 +36,13 @@ export class AuthService {
     this.REFRESH_SECRET_KEY = configService.getOrThrow('JWT_REFRESH_SECRET');
   }
 
-  async getGoogleAuthUrl(): Promise<string> {
+  async getGoogleAuthUrl(origin: string): Promise<string> {
     const state = randomUUID();
-    await this.redisService.set(`oauth:${state}`, Provider.GOOGLE);
-    return this.oauthGoogleService.getAuthUrl(state);
+    await this.redisService.set(
+      `oauth:${state}`,
+      JSON.stringify({ provider: Provider.GOOGLE, origin }),
+    );
+    return this.oauthGoogleService.getAuthUrl(state, origin);
   }
 
   private async generateToken(
@@ -81,14 +84,19 @@ export class AuthService {
     deviceId: string,
     { state, provider, code }: LoginDto,
   ): Promise<LoginResponse & { refreshToken: string }> {
-    const cachedProvider: string | null = await this.redisService.get(
-      `oauth:${state}`,
-    );
-    if (!cachedProvider || cachedProvider !== provider)
+    const raw: string | null = await this.redisService.get(`oauth:${state}`);
+    if (!raw)
+      throw new UnauthorizedException('유효하지 않거나 만료된 요청입니다.');
+
+    const { provider: cachedProvider, origin } = JSON.parse(raw) as {
+      provider: string;
+      origin: string;
+    };
+    if (cachedProvider !== provider)
       throw new UnauthorizedException('유효하지 않거나 만료된 요청입니다.');
 
     // TODO: provider 분기 코드 추가
-    const payload = await this.oauthGoogleService.exchangeCode(code);
+    const payload = await this.oauthGoogleService.exchangeCode(code, origin);
     const { sub, email, email_verified, name } = payload ?? {};
     if (!payload || !sub || !email || !email_verified || !name)
       throw new UnauthorizedException('유저 정보 불러오기가 실패하였습니다.');
@@ -107,6 +115,10 @@ export class AuthService {
       update: { token: hashedToken, revokedAt: null },
       create: { deviceId, token: hashedToken, userId: user.id },
     });
+
+    // 로그인 성공 → state 일회용 소비(재사용/replay 방지)
+    await this.redisService.del(`oauth:${state}`);
+
     return { accessToken, refreshToken, tokenType: 'Bearer' };
   }
 

@@ -66,9 +66,10 @@ export class AuthController {
     const deviceId: string =
       (req.cookies?.[DEVICE_ID_COOKIE_KEY] as string | undefined) ??
       randomUUID();
+    const origin = req.headers.origin ?? 'http://localhost:5173';
 
     res.cookie(DEVICE_ID_COOKIE_KEY, deviceId, this.deviceIdCookieOptions);
-    const url: string = await this.authService.getGoogleAuthUrl();
+    const url: string = await this.authService.getGoogleAuthUrl(origin);
     return { url };
   }
 
