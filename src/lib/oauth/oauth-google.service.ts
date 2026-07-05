@@ -3,11 +3,15 @@ import {
   InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
+import {
+  OauthProfile,
+  OauthProvider,
+} from '@/lib/oauth/oauth-provider.interface';
 
 @Injectable()
-export class OauthGoogleService {
+export class OauthGoogleService implements OauthProvider {
   private readonly client: OAuth2Client;
   private readonly redirectPath: string;
 
@@ -32,7 +36,8 @@ export class OauthGoogleService {
     });
   }
 
-  async exchangeCode(code: string, origin: string) {
+  async getProfile(code: string, origin: string): Promise<OauthProfile> {
+    let payload: TokenPayload | undefined;
     try {
       const { tokens } = await this.client.getToken({
         code,
@@ -42,7 +47,7 @@ export class OauthGoogleService {
         idToken: tokens.id_token!,
         audience: this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID'),
       });
-      return ticket.getPayload();
+      payload = ticket.getPayload();
     } catch (e: any) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const oauthError = e.response?.data?.error as string | undefined;
@@ -54,5 +59,12 @@ export class OauthGoogleService {
         '로그인 처리 중 오류가 발생했습니다.',
       );
     }
+
+    // 검증은 try 밖에서 → UnauthorizedException 이 위 catch 에 삼켜지지 않도록
+    const { sub, email, email_verified, name } = payload ?? {};
+    if (!payload || !sub || !email || !email_verified || !name)
+      throw new UnauthorizedException('유저 정보 불러오기가 실패하였습니다.');
+
+    return { providerId: sub, email, name };
   }
 }
