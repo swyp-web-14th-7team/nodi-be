@@ -1,6 +1,6 @@
 services:
   backend_blue:
-    build: .
+    image: ghcr.io/swyp-web-14th-7team/nodi-be:latest
     env_file:
       - .env.deploy
     deploy:
@@ -13,7 +13,7 @@ services:
     stop_grace_period: 30s
 
   backend_green:
-    build: .
+    image: ghcr.io/swyp-web-14th-7team/nodi-be:latest
     env_file:
       - .env.deploy
     deploy:

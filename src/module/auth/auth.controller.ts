@@ -166,7 +166,7 @@ export class AuthController {
       throw new BadRequestException('refreshToken 이 필요합니다.');
 
     await this.authService.logout(deviceId, refreshToken);
-    res.clearCookie(REFRESH_TOKEN_KEY);
+    res.clearCookie(REFRESH_TOKEN_KEY, this.refreshTokenCookieOptions);
     return;
   }
 
