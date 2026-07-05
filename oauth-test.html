@@ -85,6 +85,7 @@
     <div class="row">
       <button id="loginBtn">① 구글 로그인 시작</button>
       <button id="naverBtn">① 네이버 로그인 시작</button>
+      <button id="kakaoBtn">① 카카오 로그인 시작</button>
       <button id="refreshBtn">② 토큰 refresh</button>
       <button id="logoutBtn">③ 로그아웃</button>
       <button id="clearBtn" class="secondary">로그 지우기</button>
@@ -193,6 +194,7 @@
 
       $('loginBtn').onclick = () => startLogin('GOOGLE');
       $('naverBtn').onclick = () => startLogin('NAVER');
+      $('kakaoBtn').onclick = () => startLogin('KAKAO');
 
       // ② 토큰 refresh: 쿠키의 refresh_token 으로 accessToken/refreshToken 갱신
       $('refreshBtn').onclick = async () => {
