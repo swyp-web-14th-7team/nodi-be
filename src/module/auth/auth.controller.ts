@@ -54,6 +54,13 @@ export class AuthController {
    * 구글 소셜로그인 Url
    * @remarks
    * 소셜 로그인용 Url 을 요청합니다. deviceId 가 없다면 uuid 형식으로 세팅합니다.
+   *
+   * **redirect_uri 는 요청의 Origin 헤더 + 서버 고정 경로로 만들어집니다.**
+   * - 즉 이 요청을 보낸 프론트의 origin 으로 구글이 콜백합니다.
+   *   (예: Origin `https://app.example.com` → `https://app.example.com{GOOGLE_REDIRECT_PATH}`)
+   * - 브라우저 fetch 로 호출하면 Origin 이 자동으로 붙습니다. Origin 이 없으면 기본값으로 fallback 됩니다.
+   * - 해당 `origin + path` 가 **구글 콘솔의 승인된 리디렉션 URI 에 등록**돼 있어야 합니다. 없으면 로그인 시 redirect_uri_mismatch 로 실패합니다.
+   * - origin 은 state 와 함께 저장되어, 로그인(code 교환) 시 동일한 값으로 사용됩니다.
    * @param req
    * @param res
    */
