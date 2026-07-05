@@ -31,6 +31,7 @@ async function bootstrap() {
     .setVersion(`${process.env.npm_package_version}`)
     .addBearerAuth()
     .addServer(`http://localhost:${port}`, 'local')
+    .addServer(`${process.env.PRODUCTION_URL}`, '배포 서버')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   normalizeSuccessStatus(document);
