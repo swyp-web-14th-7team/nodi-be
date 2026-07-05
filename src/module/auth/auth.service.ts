@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { RedisService } from '@/lib/redis/redis.service';
 import { Provider } from '@/common/enum/provider.enum';
-import { OauthGoogleService } from '@/lib/oauth/oauth-google.service';
+import { OauthResolver } from '@/lib/oauth/oauth-resolver.service';
 import { type LoginDto } from '@/module/auth/dto/login.dto';
 import { User } from '@/prisma/client';
 import { LoginResponse } from '@/module/auth/type/login-response.type';
@@ -25,7 +25,7 @@ export class AuthService {
 
   constructor(
     private readonly usersService: UsersService,
-    private readonly oauthGoogleService: OauthGoogleService,
+    private readonly oauthResolver: OauthResolver,
     private readonly redisService: RedisService,
     private readonly jwtService: JwtService,
     private readonly prismaService: PrismaService,
@@ -36,13 +36,13 @@ export class AuthService {
     this.REFRESH_SECRET_KEY = configService.getOrThrow('JWT_REFRESH_SECRET');
   }
 
-  async getGoogleAuthUrl(origin: string): Promise<string> {
+  async getAuthUrl(provider: Provider, origin: string): Promise<string> {
     const state = randomUUID();
     await this.redisService.set(
       `oauth:${state}`,
-      JSON.stringify({ provider: Provider.GOOGLE, origin }),
+      JSON.stringify({ provider, origin }),
     );
-    return this.oauthGoogleService.getAuthUrl(state, origin);
+    return this.oauthResolver.get(provider).getAuthUrl(state, origin);
   }
 
   private async generateToken(
@@ -95,17 +95,15 @@ export class AuthService {
     if (cachedProvider !== provider)
       throw new UnauthorizedException('유효하지 않거나 만료된 요청입니다.');
 
-    // TODO: provider 분기 코드 추가
-    const payload = await this.oauthGoogleService.exchangeCode(code, origin);
-    const { sub, email, email_verified, name } = payload ?? {};
-    if (!payload || !sub || !email || !email_verified || !name)
-      throw new UnauthorizedException('유저 정보 불러오기가 실패하였습니다.');
+    const profile = await this.oauthResolver
+      .get(provider as Provider)
+      .getProfile(code, origin, state);
 
     const user: User = await this.usersService.login({
-      email,
+      email: profile.email,
       provider,
-      providerId: sub,
-      name,
+      providerId: profile.providerId,
+      name: profile.name,
     });
 
     const { accessToken, refreshToken } = await this.generateToken(user.id);

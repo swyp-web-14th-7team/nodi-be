@@ -75,15 +75,17 @@
     </style>
   </head>
   <body>
-    <h1>🔐 Google OAuth 테스트</h1>
+    <h1>🔐 OAuth 테스트 (Google / Naver)</h1>
 
     <div class="row">
       <label style="width: 80px">API Base</label>
-      <input id="apiBase" type="text" value="http://localhost:8080" />
+      <input id="apiBase" type="text" value="http://localhost:3000" />
     </div>
 
     <div class="row">
       <button id="loginBtn">① 구글 로그인 시작</button>
+      <button id="naverBtn">① 네이버 로그인 시작</button>
+      <button id="kakaoBtn">① 카카오 로그인 시작</button>
       <button id="refreshBtn">② 토큰 refresh</button>
       <button id="logoutBtn">③ 로그아웃</button>
       <button id="clearBtn" class="secondary">로그 지우기</button>
@@ -105,7 +107,6 @@
     <script>
       const $ = (id) => document.getElementById(id);
       const apiBase = () => $('apiBase').value.replace(/\/+$/, '');
-      const PROVIDER = 'GOOGLE'; // Provider enum 값과 일치해야 함
 
       // API Base 를 sessionStorage 에 저장해 OAuth 리다이렉트(페이지 새 로드) 후에도 유지
       // 탭 닫으면 자동 삭제되고, 아래 TTL(1시간)로 만료도 처리
@@ -163,28 +164,37 @@
         return { res, json };
       };
 
-      // ① 로그인 시작: 백엔드에서 구글 인가 URL 받아 이동
-      $('loginBtn').onclick = async () => {
+      // ① 로그인 시작: 백엔드에서 인가 URL 받아 이동
+      // provider: 'GOOGLE' | 'NAVER' — 엔드포인트는 소문자(/auth/google, /auth/naver)
+      const startLogin = async (provider) => {
         try {
-          phase('로그인 URL 요청 중…');
-          const res = await fetch(`${apiBase()}/auth/google`, {
+          const path = `/auth/${provider.toLowerCase()}`;
+          phase(`${provider} 로그인 URL 요청 중…`);
+          // 콜백은 같은 페이지로 돌아오므로, 어떤 provider 로 시작했는지 저장해둠
+          sessionStorage.setItem('provider', provider);
+
+          const res = await fetch(`${apiBase()}${path}`, {
             method: 'GET',
             credentials: 'include', // device_id 쿠키 주고받기
           });
           const json = await res.json();
-          log(`GET /auth/google → ${res.status}`, json);
+          log(`GET ${path} → ${res.status}`, json);
 
           // TransformInterceptor 래핑(data.url) / 비래핑(url) 둘 다 대응
           const url = json?.data?.url ?? json?.url;
           if (!url) throw new Error('응답에 url 이 없습니다');
 
-          phase('구글로 이동합니다…');
+          phase(`${provider} 로 이동합니다…`);
           window.location.href = url;
         } catch (e) {
           phase('<span class="badge err">실패</span>');
           log('로그인 시작 실패: ' + e.message);
         }
       };
+
+      $('loginBtn').onclick = () => startLogin('GOOGLE');
+      $('naverBtn').onclick = () => startLogin('NAVER');
+      $('kakaoBtn').onclick = () => startLogin('KAKAO');
 
       // ② 토큰 refresh: 쿠키의 refresh_token 으로 accessToken/refreshToken 갱신
       $('refreshBtn').onclick = async () => {
@@ -225,7 +235,7 @@
 
       $('clearBtn').onclick = () => ($('log').textContent = '대기 중…');
 
-      // ③ 콜백 처리: 구글이 ?code&state(또는 ?error)로 이 페이지에 돌아옴
+      // ③ 콜백 처리: provider 가 ?code&state(또는 ?error)로 이 페이지에 돌아옴
       (async function handleCallback() {
         const q = new URLSearchParams(location.search);
         const code = q.get('code');
@@ -233,8 +243,8 @@
         const error = q.get('error');
 
         if (error) {
-          phase('<span class="badge err">구글 에러</span>');
-          log('구글이 error 반환', {
+          phase('<span class="badge err">OAuth 에러</span>');
+          log('provider 가 error 반환', {
             error,
             error_description: q.get('error_description'),
           });
@@ -242,15 +252,17 @@
         }
         if (!code) return; // 콜백이 아니라 그냥 첫 진입
 
-        log('콜백 수신', { code: code.slice(0, 12) + '…', state });
-        phase('백엔드로 code 교환 요청 중…');
+        // 로그인 시작 시 저장해둔 provider (없으면 GOOGLE 기본)
+        const provider = sessionStorage.getItem('provider') || 'GOOGLE';
+        log('콜백 수신', { provider, code: code.slice(0, 12) + '…', state });
+        phase(`백엔드로 ${provider} code 교환 요청 중…`);
 
         try {
           const res = await fetch(`${apiBase()}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ provider: PROVIDER, code, state }),
+            body: JSON.stringify({ provider, code, state }),
           });
           const json = await res.json();
           log(`POST /auth/login → ${res.status}`, json);
@@ -266,6 +278,7 @@
         } finally {
           // 새로고침 시 code 재사용(invalid_grant) 방지: 쿼리 제거
           history.replaceState({}, '', location.pathname);
+          sessionStorage.removeItem('provider'); // 사용한 provider 정리
         }
       })();
     </script>

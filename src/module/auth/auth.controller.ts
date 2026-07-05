@@ -15,6 +15,7 @@ import { LoginDto } from '@/module/auth/dto/login.dto';
 import { LoginResponse } from '@/module/auth/type/login-response.type';
 import { JwtRefreshTokenExpiresMs } from '@/common/constant/jwt';
 import { GetOauthResponse } from '@/module/auth/type/get-oauth-response.type';
+import { Provider } from '@/common/enum/provider.enum';
 import { ApiResponseSuccess } from '@/common/decorator/api-response-success.decorator';
 import {
   ApiBadRequestResponse,
@@ -70,13 +71,62 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    return this.issueAuthUrl(Provider.GOOGLE, req, res);
+  }
+
+  /**
+   * 네이버 소셜로그인 Url
+   * @remarks
+   * 네이버 로그인용 Url 을 요청합니다. redirect_uri 규칙은 구글과 동일합니다.
+   *
+   * **redirect_uri 는 요청의 Origin 헤더 + 서버 고정 경로(NAVER_REDIRECT_PATH)로 만들어집니다.**
+   * - 해당 `origin + path` 가 **네이버 개발자센터의 Callback URL 에 등록**돼 있어야 합니다.
+   * - origin 은 state 와 함께 저장되어, 로그인(code 교환) 시 동일한 값으로 사용됩니다.
+   * @param req
+   * @param res
+   */
+  @Get('naver')
+  @ApiResponseSuccess(GetOauthResponse)
+  async getNaverLoginUrl(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.issueAuthUrl(Provider.NAVER, req, res);
+  }
+
+  /**
+   * 카카오 소셜로그인 Url
+   * @remarks
+   * 카카오 로그인용 Url 을 요청합니다. redirect_uri 규칙은 구글/네이버와 동일합니다.
+   *
+   * **redirect_uri 는 요청의 Origin 헤더 + 서버 고정 경로(KAKAO_REDIRECT_PATH)로 만들어집니다.**
+   * - 해당 `origin + path` 가 **카카오 개발자 콘솔의 Redirect URI 에 등록**돼 있어야 합니다.
+   * - origin 은 state 와 함께 저장되어, 로그인(code 교환) 시 동일한 값으로 사용됩니다.
+   * @param req
+   * @param res
+   */
+  @Get('kakao')
+  @ApiResponseSuccess(GetOauthResponse)
+  async getKakaoLoginUrl(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.issueAuthUrl(Provider.KAKAO, req, res);
+  }
+
+  /** 소셜 로그인 인가 URL 발급 공통 처리 (deviceId 세팅 + origin 기반 URL 생성) */
+  private async issueAuthUrl(
+    provider: Provider,
+    req: Request,
+    res: Response,
+  ): Promise<{ url: string }> {
     const deviceId: string =
       (req.cookies?.[DEVICE_ID_COOKIE_KEY] as string | undefined) ??
       randomUUID();
     const origin = req.headers.origin ?? 'http://localhost:5173';
 
     res.cookie(DEVICE_ID_COOKIE_KEY, deviceId, this.deviceIdCookieOptions);
-    const url: string = await this.authService.getGoogleAuthUrl(origin);
+    const url: string = await this.authService.getAuthUrl(provider, origin);
     return { url };
   }
 

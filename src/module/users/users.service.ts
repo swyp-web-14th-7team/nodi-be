@@ -74,7 +74,13 @@ export class UsersService {
     if (byAuth) return byAuth;
 
     const byEmail: User | null = await this.findUnique({ email });
-    if (byEmail) return byEmail;
+    if (byEmail) {
+      // 같은 이메일 유저가 있으면 신규 가입 대신 새 provider 인증만 연결
+      await this.prismaService.userAuth.create({
+        data: { userId: byEmail.id, provider, providerId },
+      });
+      return byEmail;
+    }
 
     return this.signUp({ name, email, provider, providerId });
   }
