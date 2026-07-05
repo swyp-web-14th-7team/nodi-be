@@ -16,7 +16,45 @@ env:
   IMAGE_NAME: ${{ github.repository }} # 예: swyp-web-14th-7team/nodi-be
 
 jobs:
+  # ── 1) 버전 태그 중복 검사 ─────────────────────────────
+  # package.json 의 version 이 이미 GHCR 에 있으면 실패 → build 잡이 안 돎(취소)
+  # 레지스트리 조회만 하므로 저렴한 x86 러너 사용
+  check-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read # 태그 존재 확인용
+    outputs:
+      version: ${{ steps.pkg.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from package.json
+        id: pkg
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fail if version tag already exists
+        run: |
+          IMAGE=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          TAG="${{ env.REGISTRY }}/$IMAGE:v${{ steps.pkg.outputs.version }}"
+          if docker manifest inspect "$TAG" >/dev/null 2>&1; then
+            echo "::error::$TAG 이미 존재 — package.json version 을 올리세요."
+            exit 1
+          fi
+          echo "$TAG 없음 → 빌드 진행"
+
+  # ── 2) 이미지 빌드 & 푸시 ──────────────────────────────
+  # check-version 성공 시에만 실행 (중복 버전이면 여기 도달 못 함)
   build-and-push:
+    needs: check-version
     # arm64 네이티브 러너 → QEMU 에뮬레이션 없이 빠르게 arm64 빌드
     # (private repo 에서 arm 러너를 못 쓰는 플랜이면 runs-on: ubuntu-latest 로 바꾸고
     #  아래 'Set up QEMU' 스텝 주석을 해제할 것)
@@ -28,11 +66,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      # package.json 의 version 을 읽어 이미지 태그로 사용
-      - name: Read version from package.json
-        id: pkg
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
       # QEMU (에뮬레이션으로 arm64 빌드할 때만 필요 — 네이티브 arm 러너면 불필요)
       # - name: Set up QEMU
@@ -58,7 +91,7 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha,format=long
-            type=raw,value=v${{ steps.pkg.outputs.version }}
+            type=raw,value=v${{ needs.check-version.outputs.version }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
