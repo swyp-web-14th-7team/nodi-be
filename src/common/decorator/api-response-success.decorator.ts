@@ -4,11 +4,15 @@ import { ResponseSuccess } from '@/common/type/response-success.type';
 
 export const ApiResponseSuccess = <TModel extends Type>(
   model?: TModel,
-  options?: { status?: number },
+  options?: { status?: number; isArray?: boolean },
 ) => {
-  const dataSchema = model
+  const modelSchema = model
     ? { $ref: getSchemaPath(model) }
     : { type: 'object' as const, additionalProperties: false, examples: {} };
+  // isArray 면 data 를 배열 스키마로 감쌈
+  const dataSchema = options?.isArray
+    ? { type: 'array' as const, items: modelSchema }
+    : modelSchema;
 
   return applyDecorators(
     ApiExtraModels(...(model ? [ResponseSuccess, model] : [ResponseSuccess])),

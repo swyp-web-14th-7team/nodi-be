@@ -74,8 +74,9 @@ model JobType {
 
 // -------------- 유저 프로필 카드 --------------
 model UserProfileCard {
-  id       Int    @id @default(autoincrement()) @db.UnsignedInt
-  nickname String @db.VarChar(255) // 프로필 카드 닉네임, 기본값은 user.name
+  id           Int     @id @default(autoincrement()) @db.UnsignedInt
+  nickname     String  @db.VarChar(255) // 프로필 카드 닉네임, 기본값은 user.name
+  cardImageUrl String? @map("card_image_url") @db.VarChar(500)
 
   userId String @map("user_id") @db.Char(26)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
