@@ -1,5 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
+} from 'class-validator';
 
 export class CreateProfileCardDto {
   @ApiProperty({ description: '템플릿 ID (number)' })
@@ -7,10 +14,10 @@ export class CreateProfileCardDto {
   @IsNumber()
   templateId: number;
 
-  @ApiProperty({
-    description: '온보딩 시에만 isDefault: true, 나머지 경우 false',
-    default: false,
-  })
-  @IsBoolean()
-  isDefault: boolean;
+  @ApiPropertyOptional({ description: '프로필 카드 이미지 URL' })
+  @Length(10, 500)
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  cardImageUrl?: string;
 }

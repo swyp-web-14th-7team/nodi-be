@@ -12,6 +12,16 @@ import { ProfileCardResponse } from '@/module/profile-cards/type/profile-card-re
 export class ProfileCardsController {
   constructor(private readonly profileCardsService: ProfileCardsService) {}
 
+  /**
+   * 유저 프로필 카드 생성 (온보딩)
+   * @remarks
+   * 유저 프로필 카드를 생성합니다. 동작 방식은 두 가지로 나뉩니다.
+   *
+   * 1. 유저의 Default 프로필 카드가 없는 경우 (온보딩)
+   * 2. 유저의 Default 프로필 카드가 있는 경우 (추후 카드 생성 시점)
+   * @param user
+   * @param dto
+   */
   @Post()
   @Auth(UserRole.ADMIN, UserRole.USER)
   @ApiResponseSuccess(ProfileCardResponse)
