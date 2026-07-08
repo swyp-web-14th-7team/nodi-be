@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/lib/prisma/prisma.service';
-import { User, UserProfileCard } from '@/prisma/client';
+import { Prisma, User, UserProfileCard } from '@/prisma/client';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
+import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
 import {
   defaultProfileCardIncludeOptions,
   type DefaultUserProfileCard,
@@ -18,6 +19,14 @@ export class ProfileCardsRepository {
     return this.prismaService.userProfileCard.findUnique({
       where: { userId_isDefault: { userId, isDefault: true } },
       include: defaultProfileCardIncludeOptions,
+    });
+  }
+
+  async findUniqueProfileCard(
+    whereOptions: Prisma.UserProfileCardWhereUniqueInput,
+  ): Promise<UserProfileCard | null> {
+    return this.prismaService.userProfileCard.findUnique({
+      where: whereOptions,
     });
   }
 
@@ -53,6 +62,7 @@ export class ProfileCardsRepository {
         nickname: defaultCard.nickname,
         templateId: dto.templateId,
         cardImageUrl: dto.cardImageUrl,
+        personalityId: defaultCard.personalityId, // 개성은 단일 FK 복사
         isDefault: false,
         isActive: false,
         profileCardSkills: {
@@ -69,13 +79,47 @@ export class ProfileCardsRepository {
             })),
           },
         },
-        profileCardPersonalities: {
-          createMany: {
-            data: defaultCard.profileCardPersonalities.map(
-              ({ personalityId }) => ({ personalityId }),
-            ),
+      },
+    });
+  }
+
+  /**
+   * 프로필 카드 수정
+   * - dto 에 포함된 필드만 변경 (undefined 는 그대로)
+   * - skills / interests 는 dto 목록으로 덮어씀:
+   *   목록에 없는 것만 삭제(notIn) + 없는 것만 추가(skipDuplicates), 기존에 유지되는 건 안 건드림
+   * - personality 는 단일 FK 세팅
+   * - nested write 라 한 update 안에서 원자적으로 처리됨
+   */
+  async updateProfileCard(
+    id: number,
+    dto: UpdateProfileCardDto,
+  ): Promise<UserProfileCard> {
+    return this.prismaService.userProfileCard.update({
+      where: { id },
+      data: {
+        description: dto.description,
+        ...(dto.personalityId !== undefined && {
+          personalityId: dto.personalityId,
+        }),
+        ...(dto.skillIds !== undefined && {
+          profileCardSkills: {
+            deleteMany: { skillId: { notIn: dto.skillIds } },
+            createMany: {
+              data: dto.skillIds.map((skillId) => ({ skillId })),
+              skipDuplicates: true,
+            },
           },
-        },
+        }),
+        ...(dto.interestIds !== undefined && {
+          profileCardInterests: {
+            deleteMany: { interestId: { notIn: dto.interestIds } },
+            createMany: {
+              data: dto.interestIds.map((interestId) => ({ interestId })),
+              skipDuplicates: true,
+            },
+          },
+        }),
       },
     });
   }

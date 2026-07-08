@@ -3,7 +3,6 @@ import { Prisma } from '@/prisma/client';
 export const defaultProfileCardIncludeOptions = {
   profileCardSkills: true,
   profileCardInterests: true,
-  profileCardPersonalities: true,
 } satisfies Prisma.UserProfileCardInclude;
 
 export type DefaultUserProfileCard = Prisma.UserProfileCardGetPayload<{

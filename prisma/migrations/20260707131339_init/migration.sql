@@ -55,12 +55,14 @@ CREATE TABLE `job_types` (
 CREATE TABLE `user_profile_cards` (
     `id` INTEGER UNSIGNED NOT NULL AUTO_INCREMENT,
     `nickname` VARCHAR(255) NOT NULL,
+    `card_image_url` VARCHAR(500) NULL,
     `user_id` CHAR(26) NOT NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL,
     `is_active` BOOLEAN NOT NULL DEFAULT true,
     `is_default` BOOLEAN NULL,
     `template_id` INTEGER UNSIGNED NULL,
+    `personality_id` INTEGER UNSIGNED NULL,
 
     UNIQUE INDEX `user_profile_cards_user_id_is_default_key`(`user_id`, `is_default`),
     PRIMARY KEY (`id`)
@@ -120,14 +122,6 @@ CREATE TABLE `personalities` (
 
     UNIQUE INDEX `personalities_name_key`(`name`),
     PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `profile_card_personalities` (
-    `profile_card_id` INTEGER UNSIGNED NOT NULL,
-    `personality_id` INTEGER UNSIGNED NOT NULL,
-
-    PRIMARY KEY (`profile_card_id`, `personality_id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
@@ -196,6 +190,9 @@ ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_user_id_fkey
 ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_template_id_fkey` FOREIGN KEY (`template_id`) REFERENCES `profile_card_templates`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_personality_id_fkey` FOREIGN KEY (`personality_id`) REFERENCES `personalities`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `profile_card_interests` ADD CONSTRAINT `profile_card_interests_profile_card_id_fkey` FOREIGN KEY (`profile_card_id`) REFERENCES `user_profile_cards`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -212,12 +209,6 @@ ALTER TABLE `profile_card_skills` ADD CONSTRAINT `profile_card_skills_skill_id_f
 
 -- AddForeignKey
 ALTER TABLE `personalities` ADD CONSTRAINT `personalities_job_type_id_fkey` FOREIGN KEY (`job_type_id`) REFERENCES `job_types`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `profile_card_personalities` ADD CONSTRAINT `profile_card_personalities_profile_card_id_fkey` FOREIGN KEY (`profile_card_id`) REFERENCES `user_profile_cards`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `profile_card_personalities` ADD CONSTRAINT `profile_card_personalities_personality_id_fkey` FOREIGN KEY (`personality_id`) REFERENCES `personalities`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `profile_card_templates` ADD CONSTRAINT `profile_card_templates_job_type_id_fkey` FOREIGN KEY (`job_type_id`) REFERENCES `job_types`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

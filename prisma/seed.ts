@@ -129,6 +129,43 @@ const SKILL_SEED: Record<string, string[]> = {
   ],
 };
 
+/**
+ * 관심사 시드 데이터 (프로필 카드의 관심사 태그)
+ * 개발/디자인/기획 직군이 붙일 법한 직무·개인 관심사 (Interest.name 은 unique)
+ */
+const INTEREST_SEED: string[] = [
+  '사이드 프로젝트',
+  '오픈소스',
+  '스타트업',
+  'AI',
+  '테크 블로그',
+  '해커톤',
+  'UX/UI',
+  '창업',
+  '주식·투자',
+  '독서',
+  '글쓰기',
+  '여행',
+  '운동',
+  '러닝',
+  '등산',
+  '요가',
+  '게임',
+  '음악',
+  '악기 연주',
+  '영화',
+  '사진',
+  '그림',
+  '요리',
+  '베이킹',
+  '커피',
+  '와인',
+  '반려동물',
+  '봉사활동',
+  '외국어',
+  '캠핑',
+];
+
 async function main() {
   let categoryCount = 0;
   let skillCount = 0;
@@ -155,8 +192,18 @@ async function main() {
     console.log(`  [${categoryName}] 스킬 ${skills.length}개 시드 완료`);
   }
 
+  // 관심사 upsert (재실행해도 중복 생성 안 함)
+  for (const interestName of INTEREST_SEED) {
+    await prisma.interest.upsert({
+      where: { name: interestName },
+      update: {},
+      create: { name: interestName },
+    });
+  }
+  console.log(`  [관심사] ${INTEREST_SEED.length}개 시드 완료`);
+
   console.log(
-    `\n✅ 카테고리 ${categoryCount}개 / 스킬 ${skillCount}개 시드 완료`,
+    `\n✅ 카테고리 ${categoryCount}개 / 스킬 ${skillCount}개 / 관심사 ${INTEREST_SEED.length}개 시드 완료`,
   );
 }
 

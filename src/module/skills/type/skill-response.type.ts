@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { SkillWithCategory } from '@/module/skills/skill.type';
+import { SkillCategoryResponse } from '@/module/skill-categories/type/skill-category-response.type';
 
 export class SkillResponse {
   @ApiProperty()
@@ -9,17 +10,13 @@ export class SkillResponse {
   name: string;
 
   @ApiProperty()
-  categoryId: number;
-
-  @ApiProperty()
-  categoryName: string;
+  category: SkillCategoryResponse;
 
   static fromSkill(item: SkillWithCategory): SkillResponse {
     return {
       id: item.id,
       name: item.name,
-      categoryId: item.categoryId,
-      categoryName: item.category.name,
+      category: SkillCategoryResponse.fromCategory(item.category),
     };
   }
 }

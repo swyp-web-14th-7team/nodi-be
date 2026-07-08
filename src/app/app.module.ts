@@ -10,6 +10,7 @@ import { PrismaModule } from '@/lib/prisma/prisma.module';
 import { ProfileCardsModule } from '@/module/profile-cards/profile-cards.module';
 import { SkillsModule } from '@/module/skills/skills.module';
 import { SkillCategoriesModule } from '@/module/skill-categories/skill-categories.module';
+import { InterestsModule } from '@/module/interests/interests.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SkillCategoriesModule } from '@/module/skill-categories/skill-categorie
     ProfileCardsModule,
     SkillsModule,
     SkillCategoriesModule,
+    InterestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

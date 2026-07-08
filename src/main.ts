@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { TransformInterceptor } from '@/common/interceptor/transform.interceptor';
+import { PrismaExceptionFilter } from '@/common/filter/prisma-exception.filter';
 import cookieParser from 'cookie-parser';
 import { ValidationPipe } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
@@ -13,6 +14,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.use(cookieParser());
   app.useGlobalInterceptors(new TransformInterceptor());
+  app.useGlobalFilters(new PrismaExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
