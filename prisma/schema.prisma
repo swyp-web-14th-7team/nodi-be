@@ -77,6 +77,7 @@ model UserProfileCard {
   id           Int     @id @default(autoincrement()) @db.UnsignedInt
   nickname     String  @db.VarChar(255) // 프로필 카드 닉네임, 기본값은 user.name
   cardImageUrl String? @map("card_image_url") @db.VarChar(500)
+  description  String  @default("") @db.VarChar(2000)
 
   userId String @map("user_id") @db.Char(26)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -89,11 +90,14 @@ model UserProfileCard {
   templateId Int?                 @map("template_id") @db.UnsignedInt
   template   ProfileCardTemplate? @relation(fields: [templateId], references: [id], onDelete: Restrict)
 
-  profileCardSkills        ProfileCardSkill[]
-  profileCardInterests     ProfileCardInterest[]
-  profileCardItems         ProfileCardItem[]
-  profileCardPersonalities ProfileCardPersonality[]
-  userCollections          UserCollection[]
+  // 카드당 개성 하나만 선택
+  personalityId Int?         @map("personality_id") @db.UnsignedInt
+  personality   Personality? @relation(fields: [personalityId], references: [id], onDelete: Restrict)
+
+  profileCardSkills    ProfileCardSkill[]
+  profileCardInterests ProfileCardInterest[]
+  profileCardItems     ProfileCardItem[]
+  userCollections      UserCollection[]
 
   @@unique([userId, isDefault])
   @@map("user_profile_cards")
@@ -164,20 +168,9 @@ model Personality {
 
   imageUrl String? @map("image_url") @db.VarChar(500)
 
-  profileCardPersonalities ProfileCardPersonality[]
+  profileCards UserProfileCard[]
 
   @@map("personalities")
-}
-
-model ProfileCardPersonality {
-  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
-  profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id], onDelete: Cascade)
-
-  personalityId Int         @map("personality_id") @db.UnsignedInt
-  personality   Personality @relation(fields: [personalityId], references: [id], onDelete: Restrict)
-
-  @@id([profileCardId, personalityId])
-  @@map("profile_card_personalities")
 }
 
 // -------------- 프로필 카드 템플릿 --------------
