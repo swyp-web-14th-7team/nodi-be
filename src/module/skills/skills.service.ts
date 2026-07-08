@@ -9,14 +9,17 @@ import { SkillsRepository } from '@/module/skills/skills.repository';
 import { CreateSkillDto } from '@/module/skills/dto/create-skill.dto';
 import { UpdateSkillDto } from '@/module/skills/dto/update-skill.dto';
 import { SkillWithCategory } from '@/module/skills/skill.type';
+import { FindSkillsDto } from '@/module/skills/dto/find-skills.dto';
 
 @Injectable()
 export class SkillsService {
   constructor(private readonly skillsRepository: SkillsRepository) {}
 
-  /** 스킬 목록 조회 (categoryId 로 필터 가능) */
-  async findAll(categoryId?: number): Promise<SkillWithCategory[]> {
-    return this.skillsRepository.findAll(categoryId);
+  /** 스킬 목록 조회 (categoryId·search 로 필터 가능) */
+  async findAll(
+    dto: FindSkillsDto,
+  ): Promise<{ items: SkillWithCategory[]; total: number }> {
+    return this.skillsRepository.findAll(dto);
   }
 
   async findById(id: number): Promise<SkillWithCategory> {

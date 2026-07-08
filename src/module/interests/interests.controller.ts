@@ -20,7 +20,7 @@ import { CreateInterestDto } from '@/module/interests/dto/create-interest.dto';
 import { UpdateInterestDto } from '@/module/interests/dto/update-interest.dto';
 import { InterestResponse } from '@/module/interests/type/interest-response.type';
 import { PaginationType } from '@/common/type/pagination.type';
-import { PaginationDto } from '@/common/dto/pagination.dto';
+import { FindInterestDto } from '@/module/interests/dto/find-interest.dto';
 
 @Controller('interests')
 export class InterestsController {
@@ -30,16 +30,15 @@ export class InterestsController {
    * 모든 interests 를 조회합니다.
    *
    * @remarks
-   * interest 는 createdAt 이 없기에 query 파라메터의 sort 는 name 으로 고정됩니다.
+   * interest 는 createdAt 이 없어 sort 는 id·name 만 허용하며 기본값은 name 입니다.
    * @param dto
    */
   @Get()
   @Auth(UserRole.USER, UserRole.ADMIN)
   @ApiResponsePagination(InterestResponse)
   async findAll(
-    @Query() dto: PaginationDto,
+    @Query() dto: FindInterestDto,
   ): Promise<PaginationType<InterestResponse>> {
-    dto.sort = 'name';
     const { items, total } = await this.interestsService.findMany(dto);
     return {
       items: items.map((item) => InterestResponse.fromInterest(item)),

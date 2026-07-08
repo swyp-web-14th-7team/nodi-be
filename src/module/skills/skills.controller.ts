@@ -17,6 +17,8 @@ import { CreateSkillDto } from '@/module/skills/dto/create-skill.dto';
 import { UpdateSkillDto } from '@/module/skills/dto/update-skill.dto';
 import { FindSkillsDto } from '@/module/skills/dto/find-skills.dto';
 import { SkillResponse } from '@/module/skills/type/skill-response.type';
+import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
+import { PaginationType } from '@/common/type/pagination.type';
 
 @Controller('skills')
 export class SkillsController {
@@ -24,14 +26,25 @@ export class SkillsController {
 
   /**
    * skill 목록 조회
-   * @remarks categoryId 를 넘기면 해당 카테고리의 skill 만 필터링합니다. (생략 시 전체)
+   * @remarks
+   * categoryId 를 넘기면 해당 카테고리의 skill 만, search 를 넘기면 name 부분 일치로 필터링합니다. (생략 시 전체)
+   *
+   * sort 는 id·name 만 허용하며 기본값은 name 입니다.
    */
   @Get()
   @Auth(UserRole.USER, UserRole.ADMIN)
-  @ApiResponseSuccess(SkillResponse, { isArray: true })
-  async findAll(@Query() dto: FindSkillsDto): Promise<SkillResponse[]> {
-    const skills = await this.skillsService.findAll(dto.categoryId);
-    return skills.map((skill) => SkillResponse.fromSkill(skill));
+  @ApiResponsePagination(SkillResponse)
+  async findAll(
+    @Query() dto: FindSkillsDto,
+  ): Promise<PaginationType<SkillResponse>> {
+    const { items, total } = await this.skillsService.findAll(dto);
+    return {
+      items: items.map((item) => SkillResponse.fromSkill(item)),
+      metadata: {
+        ...dto,
+        total,
+      },
+    };
   }
 
   /**
