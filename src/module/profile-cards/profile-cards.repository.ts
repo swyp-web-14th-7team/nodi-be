@@ -6,7 +6,11 @@ import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-
 import {
   defaultProfileCardIncludeOptions,
   type DefaultUserProfileCard,
+  DisplayProfileCard,
+  displayProfileCardIncludeOptions,
 } from '@/module/profile-cards/profile-cards.type';
+import { PaginationDto } from '@/common/dto/pagination.dto';
+import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
 export class ProfileCardsRepository {
@@ -27,6 +31,39 @@ export class ProfileCardsRepository {
   ): Promise<UserProfileCard | null> {
     return this.prismaService.userProfileCard.findUnique({
       where: whereOptions,
+    });
+  }
+
+  async findManyDisplayProfileCards(
+    whereOptions: Prisma.UserProfileCardWhereInput,
+    { skip, limit, sort, order }: PaginationDto,
+  ): Promise<PaginationResult<DisplayProfileCard>> {
+    const [total, items] = await Promise.all([
+      this.prismaService.userProfileCard.count({ where: whereOptions }),
+      this.prismaService.userProfileCard.findMany({
+        where: whereOptions,
+        include: displayProfileCardIncludeOptions,
+        skip: skip,
+        take: limit,
+        orderBy: { [sort]: order },
+      }),
+    ]);
+    return { total, items };
+  }
+
+  async findOneDisplayProfileCard({
+    userId,
+    cardId,
+  }: {
+    userId: string;
+    cardId: string;
+  }): Promise<DisplayProfileCard | null> {
+    return this.prismaService.userProfileCard.findUnique({
+      where: {
+        userId,
+        id: cardId,
+      },
+      include: displayProfileCardIncludeOptions,
     });
   }
 
@@ -92,30 +129,39 @@ export class ProfileCardsRepository {
    * - nested write 라 한 update 안에서 원자적으로 처리됨
    */
   async updateProfileCard(
-    id: number,
-    dto: UpdateProfileCardDto,
+    id: string,
+    {
+      skillIds,
+      interestIds,
+      personalityId,
+      description,
+      affiliationStatusId,
+      affiliation,
+    }: UpdateProfileCardDto,
   ): Promise<UserProfileCard> {
     return this.prismaService.userProfileCard.update({
       where: { id },
       data: {
-        description: dto.description,
-        ...(dto.personalityId !== undefined && {
-          personalityId: dto.personalityId,
+        description,
+        affiliation,
+        affiliationStatusId,
+        ...(personalityId !== undefined && {
+          personalityId: personalityId,
         }),
-        ...(dto.skillIds !== undefined && {
+        ...(skillIds !== undefined && {
           profileCardSkills: {
-            deleteMany: { skillId: { notIn: dto.skillIds } },
+            deleteMany: { skillId: { notIn: skillIds } },
             createMany: {
-              data: dto.skillIds.map((skillId) => ({ skillId })),
+              data: skillIds.map((skillId) => ({ skillId })),
               skipDuplicates: true,
             },
           },
         }),
-        ...(dto.interestIds !== undefined && {
+        ...(interestIds !== undefined && {
           profileCardInterests: {
-            deleteMany: { interestId: { notIn: dto.interestIds } },
+            deleteMany: { interestId: { notIn: interestIds } },
             createMany: {
-              data: dto.interestIds.map((interestId) => ({ interestId })),
+              data: interestIds.map((interestId) => ({ interestId })),
               skipDuplicates: true,
             },
           },

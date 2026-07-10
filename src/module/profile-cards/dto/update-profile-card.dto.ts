@@ -4,6 +4,7 @@ import {
   IsArray,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -38,5 +39,15 @@ export class UpdateProfileCardDto {
   @IsOptional()
   description?: string;
 
-  // TODO: 현 소속 기획도 추후 추가 예정
+  @ApiPropertyOptional({ description: '소속 상태' })
+  @Min(1)
+  @IsNumber()
+  @IsOptional()
+  affiliationStatusId?: number;
+
+  @ApiPropertyOptional({ description: '소속 명칭' })
+  @IsNotEmpty()
+  @IsString()
+  @IsOptional()
+  affiliation?: string;
 }

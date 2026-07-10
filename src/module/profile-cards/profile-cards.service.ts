@@ -8,12 +8,40 @@ import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-
 import { Prisma } from '@/prisma/client';
 import type { User, UserProfileCard } from '@/prisma/client';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
+import { PaginationDto } from '@/common/dto/pagination.dto';
+import { PaginationResult } from '@/common/type/pagination-result.type';
+import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
+import { ProfileCardResponse } from '@/module/profile-cards/type/profile-card-response.type';
 
 @Injectable()
 export class ProfileCardsService {
   constructor(
     private readonly profileCardsRepository: ProfileCardsRepository,
   ) {}
+
+  async findAllDisplayProfileCards(
+    user: User,
+    paginationDto: PaginationDto,
+  ): Promise<PaginationResult<DisplayProfileCard>> {
+    return this.profileCardsRepository.findManyDisplayProfileCards(
+      { userId: user.id },
+      paginationDto,
+    );
+  }
+
+  async findOneDisplayProfileCard(
+    user: User,
+    cardId: string,
+  ): Promise<DisplayProfileCard> {
+    const profileCard: DisplayProfileCard | null =
+      await this.profileCardsRepository.findOneDisplayProfileCard({
+        userId: user.id,
+        cardId,
+      });
+    if (!profileCard)
+      throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
+    return profileCard;
+  }
 
   async createProfileCard(
     user: User,
@@ -30,13 +58,11 @@ export class ProfileCardsService {
 
   async updateProfileCard(
     user: User,
-    id: number,
+    id: string,
     dto: UpdateProfileCardDto,
   ): Promise<UserProfileCard> {
     const target: UserProfileCard | null =
-      await this.profileCardsRepository.findUniqueProfileCard({
-        id,
-      });
+      await this.profileCardsRepository.findUniqueProfileCard({ id });
     if (!target || target.userId !== user.id)
       throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
 
@@ -49,7 +75,7 @@ export class ProfileCardsService {
         e.code === 'P2003'
       )
         throw new BadRequestException(
-          '존재하지 않는 스킬/관심사/개성 ID 가 포함되어 있습니다.',
+          '존재하지 않는 스킬/관심사/개성/소속상태 ID 가 포함되어 있습니다.',
         );
       throw e;
     }

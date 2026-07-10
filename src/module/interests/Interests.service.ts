@@ -4,14 +4,13 @@ import { Interest } from '@/prisma/client';
 import { CreateInterestDto } from '@/module/interests/dto/create-interest.dto';
 import { UpdateInterestDto } from '@/module/interests/dto/update-interest.dto';
 import { FindInterestDto } from '@/module/interests/dto/find-interest.dto';
+import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
 export class InterestsService {
   constructor(private readonly interestsRepository: InterestsRepository) {}
 
-  async findMany(
-    dto: FindInterestDto,
-  ): Promise<{ items: Interest[]; total: number }> {
+  async findMany(dto: FindInterestDto): Promise<PaginationResult<Interest>> {
     return this.interestsRepository.findMany(dto);
   }
 

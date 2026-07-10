@@ -1,10 +1,11 @@
 import {
-  BadRequestException,
   Body,
   Controller,
+  Get,
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ProfileCardsService } from '@/module/profile-cards/profile-cards.service';
 import { Auth } from '@/common/decorator/auth.decorator';
@@ -15,11 +16,55 @@ import { type User, UserProfileCard } from '@/prisma/client';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
 import { ProfileCardResponse } from '@/module/profile-cards/type/profile-card-response.type';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
-import { ApiBadRequestResponse, ApiNotFoundResponse } from '@nestjs/swagger';
+import { ApiNotFoundResponse } from '@nestjs/swagger';
+import { PaginationDto } from '@/common/dto/pagination.dto';
+import { PaginationType } from '@/common/type/pagination.type';
+import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
+import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
 
 @Controller('profile-cards')
 export class ProfileCardsController {
   constructor(private readonly profileCardsService: ProfileCardsService) {}
+
+  /**
+   * 유저 프로필 카드 목록 조회
+   * @remarks
+   *
+   * @param user
+   * @param paginationDto
+   */
+  @Get()
+  @Auth(UserRole.ADMIN, UserRole.USER)
+  @ApiResponsePagination(ProfileCardResponse)
+  async getProfileCards(
+    @CurrentUser() user: User,
+    @Query() paginationDto: PaginationDto,
+  ): Promise<PaginationType<ProfileCardResponse>> {
+    const { total, items } =
+      await this.profileCardsService.findAllDisplayProfileCards(
+        user,
+        paginationDto,
+      );
+    return {
+      items: items.map((item) => ProfileCardResponse.fromProfileCard(item)),
+      metadata: {
+        ...paginationDto,
+        total,
+      },
+    };
+  }
+
+  @Get(':id')
+  @Auth(UserRole.ADMIN, UserRole.USER)
+  @ApiResponseSuccess(ProfileCardResponse)
+  async getProfileCard(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+  ): Promise<ProfileCardResponse> {
+    const item: DisplayProfileCard =
+      await this.profileCardsService.findOneDisplayProfileCard(user, id);
+    return ProfileCardResponse.fromProfileCard(item);
+  }
 
   /**
    * 유저 프로필 카드 생성
@@ -54,19 +99,15 @@ export class ProfileCardsController {
    */
   @Patch(':id')
   @Auth(UserRole.ADMIN, UserRole.USER)
-  @ApiBadRequestResponse({ description: 'id 는 숫자입니다.' })
   @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
   async updateProfileCard(
     @CurrentUser() user: User,
     @Param('id') id: string,
     @Body() dto: UpdateProfileCardDto,
   ) {
-    const targetId: number = Number(id);
-    if (Number.isNaN(targetId))
-      throw new BadRequestException('id 는 숫자입니다.');
     const data = await this.profileCardsService.updateProfileCard(
       user,
-      targetId,
+      id,
       dto,
     );
     return ProfileCardResponse.fromProfileCard(data);

@@ -2,14 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/lib/prisma/prisma.service';
 import { Interest, Prisma } from '@/prisma/client';
 import { FindInterestDto } from '@/module/interests/dto/find-interest.dto';
+import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
 export class InterestsRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async findMany(
-    dto: FindInterestDto,
-  ): Promise<{ items: Interest[]; total: number }> {
+  async findMany(dto: FindInterestDto): Promise<PaginationResult<Interest>> {
     const { skip, limit, sort, order, search } = dto;
     const where: Prisma.InterestWhereInput = search
       ? { name: { contains: search } }

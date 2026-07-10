@@ -53,9 +53,10 @@ CREATE TABLE `job_types` (
 
 -- CreateTable
 CREATE TABLE `user_profile_cards` (
-    `id` INTEGER UNSIGNED NOT NULL AUTO_INCREMENT,
+    `id` CHAR(26) NOT NULL,
     `nickname` VARCHAR(255) NOT NULL,
     `card_image_url` VARCHAR(500) NULL,
+    `description` VARCHAR(2000) NOT NULL DEFAULT '',
     `user_id` CHAR(26) NOT NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL,
@@ -63,6 +64,8 @@ CREATE TABLE `user_profile_cards` (
     `is_default` BOOLEAN NULL,
     `template_id` INTEGER UNSIGNED NULL,
     `personality_id` INTEGER UNSIGNED NULL,
+    `affiliation_status_id` INTEGER UNSIGNED NULL,
+    `affiliation` VARCHAR(255) NULL,
 
     UNIQUE INDEX `user_profile_cards_user_id_is_default_key`(`user_id`, `is_default`),
     PRIMARY KEY (`id`)
@@ -79,7 +82,7 @@ CREATE TABLE `interests` (
 
 -- CreateTable
 CREATE TABLE `profile_card_interests` (
-    `profile_card_id` INTEGER UNSIGNED NOT NULL,
+    `profile_card_id` CHAR(26) NOT NULL,
     `interest_id` INTEGER UNSIGNED NOT NULL,
 
     PRIMARY KEY (`profile_card_id`, `interest_id`)
@@ -106,7 +109,7 @@ CREATE TABLE `skills` (
 
 -- CreateTable
 CREATE TABLE `profile_card_skills` (
-    `profile_card_id` INTEGER UNSIGNED NOT NULL,
+    `profile_card_id` CHAR(26) NOT NULL,
     `skill_id` INTEGER UNSIGNED NOT NULL,
 
     PRIMARY KEY (`profile_card_id`, `skill_id`)
@@ -121,6 +124,15 @@ CREATE TABLE `personalities` (
     `image_url` VARCHAR(500) NULL,
 
     UNIQUE INDEX `personalities_name_key`(`name`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `affiliation_statuses` (
+    `id` INTEGER UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+
+    UNIQUE INDEX `affiliation_statuses_name_key`(`name`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -149,7 +161,7 @@ CREATE TABLE `profile_card_template_items` (
 CREATE TABLE `profile_card_items` (
     `id` INTEGER UNSIGNED NOT NULL AUTO_INCREMENT,
     `value` JSON NOT NULL,
-    `profile_card_id` INTEGER UNSIGNED NOT NULL,
+    `profile_card_id` CHAR(26) NOT NULL,
     `template_item_id` INTEGER UNSIGNED NOT NULL,
 
     UNIQUE INDEX `profile_card_items_profile_card_id_template_item_id_key`(`profile_card_id`, `template_item_id`),
@@ -171,7 +183,7 @@ CREATE TABLE `user_collections` (
     `id` INTEGER UNSIGNED NOT NULL AUTO_INCREMENT,
     `user_id` CHAR(26) NOT NULL,
     `group_id` INTEGER UNSIGNED NULL,
-    `card_id` INTEGER UNSIGNED NULL,
+    `card_id` CHAR(26) NULL,
 
     UNIQUE INDEX `user_collections_user_id_group_id_card_id_key`(`user_id`, `group_id`, `card_id`),
     PRIMARY KEY (`id`)
@@ -191,6 +203,9 @@ ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_template_id_
 
 -- AddForeignKey
 ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_personality_id_fkey` FOREIGN KEY (`personality_id`) REFERENCES `personalities`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_affiliation_status_id_fkey` FOREIGN KEY (`affiliation_status_id`) REFERENCES `affiliation_statuses`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `profile_card_interests` ADD CONSTRAINT `profile_card_interests_profile_card_id_fkey` FOREIGN KEY (`profile_card_id`) REFERENCES `user_profile_cards`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
