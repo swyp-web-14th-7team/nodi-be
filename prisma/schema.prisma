@@ -74,7 +74,7 @@ model JobType {
 
 // -------------- 유저 프로필 카드 --------------
 model UserProfileCard {
-  id           Int     @id @default(autoincrement()) @db.UnsignedInt
+  id           String  @id @default(ulid()) @db.Char(26)
   nickname     String  @db.VarChar(255) // 프로필 카드 닉네임, 기본값은 user.name
   cardImageUrl String? @map("card_image_url") @db.VarChar(500)
   description  String  @default("") @db.VarChar(2000)
@@ -93,6 +93,13 @@ model UserProfileCard {
   // 카드당 개성 하나만 선택
   personalityId Int?         @map("personality_id") @db.UnsignedInt
   personality   Personality? @relation(fields: [personalityId], references: [id], onDelete: Restrict)
+
+  // 카드당 현 소속 상태 하나만 선택
+  affiliationStatusId Int?               @map("affiliation_status_id") @db.UnsignedInt
+  affiliationStatus   AffiliationStatus? @relation(fields: [affiliationStatusId], references: [id], onDelete: Restrict)
+
+  // 현 소속 (자유 입력, 100자 이내)
+  affiliation String? @db.VarChar(255)
 
   profileCardSkills    ProfileCardSkill[]
   profileCardInterests ProfileCardInterest[]
@@ -114,7 +121,7 @@ model Interest {
 }
 
 model ProfileCardInterest {
-  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
+  profileCardId String          @map("profile_card_id") @db.Char(26)
   profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id], onDelete: Cascade)
 
   interestId Int      @map("interest_id") @db.UnsignedInt
@@ -147,7 +154,7 @@ model Skill {
 }
 
 model ProfileCardSkill {
-  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
+  profileCardId String          @map("profile_card_id") @db.Char(26)
   profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id], onDelete: Cascade)
 
   skillId Int   @map("skill_id") @db.UnsignedInt
@@ -171,6 +178,16 @@ model Personality {
   profileCards UserProfileCard[]
 
   @@map("personalities")
+}
+
+// 현 소속 상태 선택지 (재직중/구직중/재학중 등). 카드당 하나 선택
+model AffiliationStatus {
+  id   Int    @id @default(autoincrement()) @db.UnsignedInt
+  name String @unique @db.VarChar(100)
+
+  profileCards UserProfileCard[]
+
+  @@map("affiliation_statuses")
 }
 
 // -------------- 프로필 카드 템플릿 --------------
@@ -207,7 +224,7 @@ model ProfileCardItem {
   id    Int  @id @default(autoincrement()) @db.UnsignedInt
   value Json // 각 타입에 맞는 값
 
-  profileCardId Int             @map("profile_card_id") @db.UnsignedInt
+  profileCardId String          @map("profile_card_id") @db.Char(26)
   profileCard   UserProfileCard @relation(fields: [profileCardId], references: [id], onDelete: Cascade)
 
   templateItemId Int                     @map("template_item_id") @db.UnsignedInt
@@ -238,7 +255,7 @@ model UserCollection {
   groupId Int?             @map("group_id") @db.UnsignedInt
   group   CollectionGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  cardId Int?             @map("card_id") @db.UnsignedInt
+  cardId String?          @map("card_id") @db.Char(26)
   card   UserProfileCard? @relation(fields: [cardId], references: [id], onDelete: SetNull)
 
   @@unique([userId, groupId, cardId])

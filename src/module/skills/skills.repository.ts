@@ -3,6 +3,7 @@ import { PrismaService } from '@/lib/prisma/prisma.service';
 import { Prisma, Skill } from '@/prisma/client';
 import { SkillInclude, SkillWithCategory } from '@/module/skills/skill.type';
 import { FindSkillsDto } from '@/module/skills/dto/find-skills.dto';
+import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
 export class SkillsRepository {
@@ -16,7 +17,7 @@ export class SkillsRepository {
     limit,
     search,
     skip,
-  }: FindSkillsDto): Promise<{ items: SkillWithCategory[]; total: number }> {
+  }: FindSkillsDto): Promise<PaginationResult<SkillWithCategory>> {
     const whereOptions: Prisma.SkillWhereInput = {
       ...(categoryId ? { categoryId } : {}),
       ...(search ? { name: { contains: search } } : {}),

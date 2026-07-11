@@ -10,6 +10,7 @@ import { CreateSkillDto } from '@/module/skills/dto/create-skill.dto';
 import { UpdateSkillDto } from '@/module/skills/dto/update-skill.dto';
 import { SkillWithCategory } from '@/module/skills/skill.type';
 import { FindSkillsDto } from '@/module/skills/dto/find-skills.dto';
+import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
 export class SkillsService {
@@ -18,7 +19,7 @@ export class SkillsService {
   /** 스킬 목록 조회 (categoryId·search 로 필터 가능) */
   async findAll(
     dto: FindSkillsDto,
-  ): Promise<{ items: SkillWithCategory[]; total: number }> {
+  ): Promise<PaginationResult<SkillWithCategory>> {
     return this.skillsRepository.findAll(dto);
   }
 
