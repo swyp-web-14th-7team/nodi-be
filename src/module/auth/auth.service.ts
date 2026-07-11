@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { RedisService } from '@/lib/redis/redis.service';
 import { Provider } from '@/common/enum/provider.enum';
-import { UserRole } from '@/common/enum/user-role.enum';
 import { OauthResolver } from '@/lib/oauth/oauth-resolver.service';
 import { type LoginDto } from '@/module/auth/dto/login.dto';
 import { User } from '@/prisma/client';
@@ -48,14 +47,16 @@ export class AuthService {
 
   private async generateToken(
     userId: string,
+    role: number,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const payload: JwtPayload = { sub: userId };
+    // role 은 access token 의 앞단 컷에만 쓰인다.
+    // refresh 는 /auth/refresh 에서 DB 로 role 을 재조회하므로 role claim 불필요.
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
+      this.jwtService.signAsync({ sub: userId, role } satisfies JwtPayload, {
         expiresIn: JwtAccessTokenExpires,
         secret: this.SECRET_KEY,
       }),
-      this.jwtService.signAsync(payload, {
+      this.jwtService.signAsync({ sub: userId } satisfies JwtPayload, {
         expiresIn: JwtRefreshTokenExpires,
         secret: this.REFRESH_SECRET_KEY,
       }),
@@ -83,22 +84,7 @@ export class AuthService {
 
   async login(
     deviceId: string,
-    loginDto: LoginDto,
-  ): Promise<LoginResponse & { refreshToken: string }> {
-    return this.authenticate(deviceId, loginDto);
-  }
-
-  async adminLogin(
-    deviceId: string,
-    loginDto: LoginDto,
-  ): Promise<LoginResponse & { refreshToken: string }> {
-    return this.authenticate(deviceId, loginDto, UserRole.ADMIN);
-  }
-
-  private async authenticate(
-    deviceId: string,
     { state, provider, code }: LoginDto,
-    requiredRole?: number,
   ): Promise<LoginResponse & { refreshToken: string }> {
     const raw: string | null = await this.redisService.get(`oauth:${state}`);
     if (!raw)
@@ -115,28 +101,17 @@ export class AuthService {
       .get(provider as Provider)
       .getProfile(code, origin, state);
 
-    let user: User;
-    if (requiredRole !== undefined) {
-      // 권한 로그인(관리자 등): 신규 생성 없이 기존 유저만 인증.
-      // 계정이 없거나 역할이 다르면 실패 (존재 여부를 노출하지 않도록 동일 메시지).
-      const existing: User | null = await this.usersService.findByLogin({
-        email: profile.email,
-        provider,
-        providerId: profile.providerId,
-      });
-      if (!existing || existing.role !== requiredRole)
-        throw new UnauthorizedException('접근 권한이 없습니다.');
-      user = existing;
-    } else {
-      user = await this.usersService.login({
-        email: profile.email,
-        provider,
-        providerId: profile.providerId,
-        name: profile.name,
-      });
-    }
+    const user: User = await this.usersService.login({
+      email: profile.email,
+      provider,
+      providerId: profile.providerId,
+      name: profile.name,
+    });
 
-    const { accessToken, refreshToken } = await this.generateToken(user.id);
+    const { accessToken, refreshToken } = await this.generateToken(
+      user.id,
+      user.role,
+    );
     const hashedToken = this.hashToken(refreshToken);
     await this.prismaService.refreshToken.upsert({
       where: { userId_deviceId: { deviceId, userId: user.id } },
@@ -170,8 +145,10 @@ export class AuthService {
     if (!oldToken || oldToken.user.id !== oldTokenPayload.sub)
       throw new UnauthorizedException('유효하지 않은 refresh 토큰입니다.');
 
+    // refresh 시 DB 의 현재 role 을 다시 굽는다 → 강등/승격이 다음 토큰에 반영됨
     const { accessToken, refreshToken } = await this.generateToken(
       oldToken.user.id,
+      oldToken.user.role,
     );
     const hashedToken = this.hashToken(refreshToken);
     await this.prismaService.refreshToken.update({
