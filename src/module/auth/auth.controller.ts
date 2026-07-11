@@ -138,6 +138,9 @@ export class AuthController {
    * 이는 GET /auth/{provider} 요청 시 자동 설정되니 신경쓰지 않아도 됨.
    *
    * body 에 provider 는 .toUpperCase 해서 보내주세요! (대문자로) (GOOGLE, KAKAO, NAVER)
+   *
+   * **Response cookie 값**
+   * - refresh_token (httpOnly)
    * @param loginDto
    * @param req
    * @param res
@@ -155,6 +158,41 @@ export class AuthController {
 
     const { accessToken, tokenType, refreshToken } =
       await this.authService.login(deviceId, loginDto);
+    res.cookie(REFRESH_TOKEN_KEY, refreshToken, this.refreshTokenCookieOptions);
+    return { accessToken, tokenType };
+  }
+
+  /**
+   * 관리자 로그인
+   * @remarks
+   * 관리자(ADMIN) 전용 로그인입니다. 일반 로그인과 동일하게 동작하되,
+   * 인증된 유저의 role 이 ADMIN 인 경우에만 성공합니다.
+   *
+   * 쿠키에 deviceId 를 uuid 형식으로 가지고 있어야 합니다.
+   * (GET /auth/{provider} 요청 시 자동 설정됩니다.)
+   *
+   * body 에 provider 는 .toUpperCase 해서 보내주세요! (대문자로) (GOOGLE, KAKAO, NAVER)
+   *
+   * **Response cookie 값**
+   * - refresh_token (httpOnly)
+   * @param loginDto
+   * @param req
+   * @param res
+   */
+  @Post('login/admin')
+  @ApiResponseSuccess(LoginResponse)
+  @ApiBadRequestResponse({ description: 'deviceId 가 필요합니다.' })
+  @ApiUnauthorizedResponse({ description: '접근 권한이 없습니다.' })
+  async adminLogin(
+    @Body() loginDto: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<LoginResponse> {
+    const { deviceId } = this.extractCookies(req);
+    if (!deviceId) throw new BadRequestException('deviceId 가 필요합니다.');
+
+    const { accessToken, tokenType, refreshToken } =
+      await this.authService.adminLogin(deviceId, loginDto);
     res.cookie(REFRESH_TOKEN_KEY, refreshToken, this.refreshTokenCookieOptions);
     return { accessToken, tokenType };
   }
