@@ -19,6 +19,7 @@ export class AppController {
     return {
       status: 'health',
       host,
+      version: process.env.npm_package_version ?? 'unknown',
       uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.floor(uptime % 60)}s`,
     };
   }

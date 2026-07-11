@@ -30,7 +30,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('프로필 카드 공유 서비스 API')
     .setDescription('프로필 카드 공유 서비스 백엔드')
-    .setVersion(`${process.env.npm_package_version}`)
+    .setVersion(`${process.env.npm_package_version ?? 'unknown'}`)
     .addBearerAuth()
     .addServer(`http://localhost:${port}`, 'local')
     .addServer(`${process.env.PRODUCTION_URL}`, '배포 서버')

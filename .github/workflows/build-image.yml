@@ -99,6 +99,9 @@ jobs:
           context: .
           platforms: linux/arm64
           push: true
+          # package.json 버전을 이미지에 주입 → node 직접 실행 시에도 Swagger 버전 표시
+          build-args: |
+            APP_VERSION=${{ needs.check-version.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # GitHub Actions 캐시로 레이어 재사용 → 빌드 속도 향상
