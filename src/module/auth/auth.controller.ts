@@ -133,7 +133,7 @@ export class AuthController {
   /**
    * 회원가입 및 로그인
    * @remarks
-   * 쿠키에 deviceId 를 uuid 형식으로 가지고 있어야 합니다.
+   * 쿠키에 device_id 를 uuid 형식으로 가지고 있어야 합니다.
    *
    * 이는 GET /auth/{provider} 요청 시 자동 설정되니 신경쓰지 않아도 됨.
    *
@@ -141,6 +141,12 @@ export class AuthController {
    *
    * **Response cookie 값**
    * - refresh_token (httpOnly)
+   *
+   * **JWT payload 구조**
+   * - accessToken: `{ sub: 유저 id, role: 역할(0=USER, 1=ADMIN) }`
+   *   - role 은 권한 가드의 앞단 컷 최적화용이며, 최종 권위는 DB 의 user.role 입니다.
+   * - refreshToken: `{ sub: 유저 id }` (role 미포함)
+   *   - refresh 시 DB 에서 현재 role 을 다시 조회해 accessToken 에 반영하므로 refresh 에는 role 을 넣지 않습니다.
    * @param loginDto
    * @param req
    * @param res
@@ -163,50 +169,15 @@ export class AuthController {
   }
 
   /**
-   * 관리자 로그인
-   * @remarks
-   * 관리자(ADMIN) 전용 로그인입니다. 일반 로그인과 동일하게 동작하되,
-   * 인증된 유저의 role 이 ADMIN 인 경우에만 성공합니다.
-   *
-   * 쿠키에 deviceId 를 uuid 형식으로 가지고 있어야 합니다.
-   * (GET /auth/{provider} 요청 시 자동 설정됩니다.)
-   *
-   * body 에 provider 는 .toUpperCase 해서 보내주세요! (대문자로) (GOOGLE, KAKAO, NAVER)
-   *
-   * **Response cookie 값**
-   * - refresh_token (httpOnly)
-   * @param loginDto
-   * @param req
-   * @param res
-   */
-  @Post('login/admin')
-  @ApiResponseSuccess(LoginResponse)
-  @ApiBadRequestResponse({ description: 'deviceId 가 필요합니다.' })
-  @ApiUnauthorizedResponse({ description: '접근 권한이 없습니다.' })
-  async adminLogin(
-    @Body() loginDto: LoginDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<LoginResponse> {
-    const { deviceId } = this.extractCookies(req);
-    if (!deviceId) throw new BadRequestException('deviceId 가 필요합니다.');
-
-    const { accessToken, tokenType, refreshToken } =
-      await this.authService.adminLogin(deviceId, loginDto);
-    res.cookie(REFRESH_TOKEN_KEY, refreshToken, this.refreshTokenCookieOptions);
-    return { accessToken, tokenType };
-  }
-
-  /**
    * 토큰 refresh
    * @remarks
    * 인증 토큰 (accessToken, refreshToken) 을 갱신합니다.
    *
    * **Request cookie 값**
-   * - deviceId
-   * - refreshToken
+   * - device_id
+   * - refresh_token
    *
-   * 결과: deviceId, refreshToken, accessToken 갱신
+   * 결과: device_id, refresh_token 갱신, accessToken 응답
    * @param req
    * @param res
    */
@@ -239,11 +210,11 @@ export class AuthController {
    * 로그아웃 (인증 비활성화) 합니다.
    *
    * **Request cookie 값**
-   * - deviceId
-   * - refreshToken
+   * - device_id
+   * - refresh_token
    *
    * **결과**
-   * - 쿠키에서 refreshToken 제거 및 DB 에서 비활성화
+   * - 쿠키에서 refresh_token 제거 및 DB 에서 비활성화
    * @param req
    * @param res
    */
