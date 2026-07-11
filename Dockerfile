@@ -15,6 +15,11 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+# npm 이 아닌 node 로 직접 실행하면 npm_package_version 이 주입되지 않음.
+# 빌드 시 APP_VERSION 을 받아 런타임 env 로 심어 Swagger setVersion 에서 사용.
+ARG APP_VERSION
+ENV npm_package_version=$APP_VERSION
+
 COPY package*.json ./
 RUN npm ci --omit=dev
 
