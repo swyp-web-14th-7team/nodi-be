@@ -28,6 +28,7 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
 
   const config = new DocumentBuilder()
+    .setOpenAPIVersion('3.1.0')
     .setTitle('프로필 카드 공유 서비스 API')
     .setDescription('프로필 카드 공유 서비스 백엔드')
     .setVersion(`${process.env.npm_package_version ?? 'unknown'}`)
