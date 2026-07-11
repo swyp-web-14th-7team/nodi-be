@@ -99,7 +99,7 @@ sleep 2   # 워커 교체 + DNS 재해석 잠깐 대기
 
 # ── 6) 스모크 테스트 (nginx 통해 실제 응답 확인) ──────────────
 log "스모크 테스트 (http://localhost/health)..."
-if ! curl -fsS -m 5 http://localhost/health > /dev/null; then
+if ! curl -fsS -m 5 http://localhost:8080/health > /dev/null; then
   err "스모크 테스트 실패 → 롤백 ($CURRENT 로 복귀)"
   printf 'set $upstream %s:3000;\n' "$CUR_SVC" > "$ACTIVE_FILE"
   docker compose exec -T "$NGINX_SVC" nginx -s reload

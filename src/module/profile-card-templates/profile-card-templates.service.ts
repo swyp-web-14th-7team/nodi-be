@@ -8,12 +8,28 @@ import { ProfileCardTemplatesRepository } from '@/module/profile-card-templates/
 import { TemplateType } from '@/module/profile-card-templates/profile-card-templates.type';
 import { CreateProfileCardTemplateDto } from '@/module/profile-card-templates/dto/create-profile-card-template.dto';
 import { UpdateProfileCardTemplateDto } from '@/module/profile-card-templates/dto/update-profile-card-template.dto';
+import { FindProfileCardTemplateDto } from '@/module/profile-card-templates/dto/find-profile-card-template.dto';
+import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
 export class ProfileCardTemplatesService {
   constructor(
     private readonly templatesRepository: ProfileCardTemplatesRepository,
   ) {}
+
+  /** 템플릿 목록 조회 (pagination) */
+  async findMany(
+    dto: FindProfileCardTemplateDto,
+  ): Promise<PaginationResult<TemplateType>> {
+    return this.templatesRepository.findMany(dto);
+  }
+
+  /** 템플릿 단건 조회 */
+  async findById(id: number): Promise<TemplateType> {
+    const template = await this.templatesRepository.findByIdWithItems(id);
+    if (!template) throw new NotFoundException('템플릿을 찾을 수 없습니다.');
+    return template;
+  }
 
   /** 새 템플릿 발행 (해당 직군의 첫 버전 또는 새 활성 버전) */
   async create(dto: CreateProfileCardTemplateDto): Promise<TemplateType> {

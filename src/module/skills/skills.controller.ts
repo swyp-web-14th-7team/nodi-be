@@ -32,7 +32,6 @@ export class SkillsController {
    * sort 는 id·name 만 허용하며 기본값은 name 입니다.
    */
   @Get()
-  @Auth(UserRole.USER, UserRole.ADMIN)
   @ApiResponsePagination(SkillResponse)
   async findAll(
     @Query() dto: FindSkillsDto,
@@ -51,7 +50,6 @@ export class SkillsController {
    * skill 단건 조회
    */
   @Get(':id')
-  @Auth(UserRole.USER, UserRole.ADMIN)
   @ApiResponseSuccess(SkillResponse)
   async findOne(@Param('id', ParseIntPipe) id: number): Promise<SkillResponse> {
     const skill = await this.skillsService.findById(id);

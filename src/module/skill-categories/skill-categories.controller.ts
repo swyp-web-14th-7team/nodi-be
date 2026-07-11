@@ -27,7 +27,6 @@ export class SkillCategoriesController {
    * 스킬 카테고리 전체 조회
    */
   @Get()
-  @Auth(UserRole.USER, UserRole.ADMIN)
   @ApiResponseSuccess(SkillCategoryResponse, { isArray: true })
   async findAll(): Promise<SkillCategoryResponse[]> {
     const categories = await this.skillCategoriesService.findAll();

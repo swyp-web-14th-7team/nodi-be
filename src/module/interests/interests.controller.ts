@@ -34,7 +34,6 @@ export class InterestsController {
    * @param dto
    */
   @Get()
-  @Auth(UserRole.USER, UserRole.ADMIN)
   @ApiResponsePagination(InterestResponse)
   async findAll(
     @Query() dto: FindInterestDto,

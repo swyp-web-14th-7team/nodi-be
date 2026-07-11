@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@/prisma/client';
 import { PrismaService } from '@/lib/prisma/prisma.service';
 import {
   templateInclude,
   TemplateType,
 } from '@/module/profile-card-templates/profile-card-templates.type';
 import { TemplateItemDto } from '@/module/profile-card-templates/dto/template-item.dto';
+import { FindProfileCardTemplateDto } from '@/module/profile-card-templates/dto/find-profile-card-template.dto';
+import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
 export class ProfileCardTemplatesRepository {
@@ -15,6 +18,25 @@ export class ProfileCardTemplatesRepository {
       where: { id },
       include: templateInclude,
     });
+  }
+
+  async findMany(
+    dto: FindProfileCardTemplateDto,
+  ): Promise<PaginationResult<TemplateType>> {
+    const { skip, limit, sort, order, jobTypeId } = dto;
+    const where: Prisma.ProfileCardTemplateWhereInput =
+      jobTypeId !== undefined ? { jobTypeId } : {};
+    const [items, total] = await Promise.all([
+      this.prismaService.profileCardTemplate.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { [sort]: order },
+        include: templateInclude,
+      }),
+      this.prismaService.profileCardTemplate.count({ where }),
+    ]);
+    return { items, total };
   }
 
   /**
