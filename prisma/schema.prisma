@@ -200,10 +200,15 @@ model ProfileCardTemplate {
 
   version Int @default(1) // 직군별 버전 탬플릿은 수정이 불가능함 (유저가 이미 사용중인경우) 이 경우에는 새 버전을 만드는 것으로 해결함
 
+  // true = 현재 서빙 버전(직군당 1개), null = draft/과거 버전
+  // isDefault 패턴 차용: nullable + unique 로 "직군당 활성 1개"를 DB 가 강제
+  isActive Boolean? @map("is_active")
+
   profileCardTemplateItems ProfileCardTemplateItem[]
   profileCards             UserProfileCard[]
 
   @@unique([jobTypeId, version])
+  @@unique([jobTypeId, isActive])
   @@map("profile_card_templates")
 }
 

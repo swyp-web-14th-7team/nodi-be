@@ -13,6 +13,7 @@ import { SkillCategoriesModule } from '@/module/skill-categories/skill-categorie
 import { InterestsModule } from '@/module/interests/interests.module';
 import { FilesModule } from '@/module/files/files.module';
 import { JobTypeModule } from '@/module/job-type/job-type.module';
+import { ProfileCardTemplatesModule } from '@/module/profile-card-templates/profile-card-templates.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { JobTypeModule } from '@/module/job-type/job-type.module';
     InterestsModule,
     FilesModule,
     JobTypeModule,
+    ProfileCardTemplatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
