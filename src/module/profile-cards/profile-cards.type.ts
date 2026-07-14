@@ -27,16 +27,12 @@ export const displayProfileCardIncludeOptions = {
   personality: true,
   affiliationStatus: true,
   purpose: true,
-  template: {
-    include: {
-      jobType: {
-        select: {
-          name: true,
-        },
-      },
+  jobType: {
+    select: {
+      name: true,
     },
   },
-  // TODO: 대표 기록 추가
+  profileCardLinks: true,
 } satisfies Prisma.UserProfileCardInclude;
 
 export type DisplayProfileCard = Prisma.UserProfileCardGetPayload<{

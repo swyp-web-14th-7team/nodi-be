@@ -3,6 +3,7 @@ import { FormattedDate } from '@/common/type/formatted-date.type';
 import { ProfileCardInterestResponse } from '@/module/profile-cards/type/profile-card-interest-response.type';
 import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
 import { UserProfileCard } from '@/prisma/client';
+import { PROFILE_CARD_LINK_TYPE_DESCRIPTION } from '@/module/profile-cards/type/profile-card-link-type.enum';
 
 export class PersonalityResponse {
   @ApiProperty()
@@ -29,6 +30,16 @@ export class PurposeResponse {
 
   @ApiProperty()
   name: string;
+}
+
+export class ProfileCardLinkResponse {
+  @ApiProperty({
+    description: `링크 종류 — ${PROFILE_CARD_LINK_TYPE_DESCRIPTION}`,
+  })
+  type: number;
+
+  @ApiProperty({ description: '링크(URL) 또는 이메일 값' })
+  value: string;
 }
 
 export class ProfileCardResponse {
@@ -83,6 +94,12 @@ export class ProfileCardResponse {
   @ApiPropertyOptional({ nullable: true, description: '기반 템플릿 직군 이름' })
   jobTypeName?: string | null;
 
+  @ApiPropertyOptional({
+    type: [ProfileCardLinkResponse],
+    description: `링크 목록. 각 항목 type — ${PROFILE_CARD_LINK_TYPE_DESCRIPTION}`,
+  })
+  links?: ProfileCardLinkResponse[];
+
   static fromProfileCard(
     item: DisplayProfileCard | UserProfileCard,
   ): ProfileCardResponse {
@@ -119,7 +136,11 @@ export class ProfileCardResponse {
       response.purpose = item.purpose
         ? { id: item.purpose.id, name: item.purpose.name }
         : null;
-      response.jobTypeName = item.template?.jobType.name ?? null;
+      response.jobTypeName = item.jobType.name;
+      response.links = item.profileCardLinks.map((link) => ({
+        type: link.type,
+        value: link.value,
+      }));
     }
 
     return response;

@@ -166,6 +166,73 @@ const INTEREST_SEED: string[] = [
   '캠핑',
 ];
 
+/**
+ * 프로필 카드 목적 시드 데이터 (카드당 하나 선택, Purpose.name 은 unique)
+ */
+const PURPOSE_SEED: string[] = [
+  '팀 빌딩',
+  '친목',
+  '커피챗',
+  '스터디',
+  '사이드 프로젝트',
+  '네트워킹',
+  '멘토링',
+  '정보 공유',
+  '이직·채용',
+];
+
+/**
+ * 현 소속 상태 시드 데이터 (카드당 하나 선택, AffiliationStatus.name 은 unique)
+ */
+const AFFILIATION_STATUS_SEED: string[] = [
+  '재직중',
+  '구직중',
+  '재학중',
+  '휴직중',
+  '프리랜서',
+  '이직 준비중',
+  '창업·운영중',
+];
+
+/**
+ * 개성 시드 데이터 (카드당 하나 선택, Personality.name 은 unique)
+ * jobTypeId 는 지정하지 않아 공통(null) 개성으로 시드한다.
+ */
+const PERSONALITY_SEED: { name: string; description: string }[] = [
+  {
+    name: '꼼꼼한 완벽주의자',
+    description: '작은 디테일도 놓치지 않고 끝까지 챙깁니다.',
+  },
+  {
+    name: '아이디어 뱅크',
+    description: '새로운 관점과 아이디어를 끊임없이 제안합니다.',
+  },
+  {
+    name: '든든한 실행가',
+    description: '말보다 행동으로, 맡은 일을 확실히 끝냅니다.',
+  },
+  {
+    name: '분위기 메이커',
+    description: '팀의 에너지를 끌어올리는 활력소입니다.',
+  },
+  {
+    name: '차분한 조율가',
+    description: '갈등 속에서도 균형을 잡고 합의를 이끌어냅니다.',
+  },
+  {
+    name: '데이터 기반 사고형',
+    description: '감보다 근거와 숫자로 판단합니다.',
+  },
+  {
+    name: '빠른 학습가',
+    description: '낯선 영역도 빠르게 익혀 실전에 적용합니다.',
+  },
+  {
+    name: '사용자 중심러',
+    description: '언제나 사용자 입장에서 먼저 고민합니다.',
+  },
+];
+
 async function main() {
   let categoryCount = 0;
   let skillCount = 0;
@@ -202,8 +269,40 @@ async function main() {
   }
   console.log(`  [관심사] ${INTEREST_SEED.length}개 시드 완료`);
 
+  // 목적 upsert
+  for (const purposeName of PURPOSE_SEED) {
+    await prisma.purpose.upsert({
+      where: { name: purposeName },
+      update: {},
+      create: { name: purposeName },
+    });
+  }
+  console.log(`  [목적] ${PURPOSE_SEED.length}개 시드 완료`);
+
+  // 현 소속 상태 upsert
+  for (const statusName of AFFILIATION_STATUS_SEED) {
+    await prisma.affiliationStatus.upsert({
+      where: { name: statusName },
+      update: {},
+      create: { name: statusName },
+    });
+  }
+  console.log(`  [소속 상태] ${AFFILIATION_STATUS_SEED.length}개 시드 완료`);
+
+  // 개성 upsert (설명은 최신화)
+  for (const personality of PERSONALITY_SEED) {
+    await prisma.personality.upsert({
+      where: { name: personality.name },
+      update: { description: personality.description },
+      create: { name: personality.name, description: personality.description },
+    });
+  }
+  console.log(`  [개성] ${PERSONALITY_SEED.length}개 시드 완료`);
+
   console.log(
-    `\n✅ 카테고리 ${categoryCount}개 / 스킬 ${skillCount}개 / 관심사 ${INTEREST_SEED.length}개 시드 완료`,
+    `\n✅ 카테고리 ${categoryCount}개 / 스킬 ${skillCount}개 / 관심사 ${INTEREST_SEED.length}개 / ` +
+      `목적 ${PURPOSE_SEED.length}개 / 소속 상태 ${AFFILIATION_STATUS_SEED.length}개 / ` +
+      `개성 ${PERSONALITY_SEED.length}개 시드 완료`,
   );
 }
 

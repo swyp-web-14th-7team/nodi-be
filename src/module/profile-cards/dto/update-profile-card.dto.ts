@@ -1,4 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   ArrayUnique,
   IsArray,
@@ -9,7 +10,10 @@ import {
   IsString,
   Length,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { ProfileCardLinkInputDto } from '@/module/profile-cards/dto/profile-card-link-input.dto';
+import { PROFILE_CARD_LINK_TYPE_DESCRIPTION } from '@/module/profile-cards/type/profile-card-link-type.enum';
 
 export class UpdateProfileCardDto {
   @ApiPropertyOptional({ description: '스킬 ID 목록', type: [Number] })
@@ -65,4 +69,14 @@ export class UpdateProfileCardDto {
   @IsNotEmpty()
   @IsOptional()
   profileImageUrl?: string;
+
+  @ApiPropertyOptional({
+    description: `링크 목록 (전체 교체: 넘긴 목록으로 덮어씀). 각 항목 type — ${PROFILE_CARD_LINK_TYPE_DESCRIPTION}`,
+    type: [ProfileCardLinkInputDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProfileCardLinkInputDto)
+  links?: ProfileCardLinkInputDto[];
 }

@@ -62,10 +62,7 @@ export class ProfileCardsRepository {
       // undefined 면 필터 없음, 값이 있으면 해당 값으로 필터
       purposeId: dto.purpose,
       affiliationStatusId: dto.affiliationStatusId,
-      // jobTypeId 는 template 관계를 통해 필터 (null/undefined 면 제외)
-      ...(dto.jobTypeId != null && {
-        template: { jobTypeId: dto.jobTypeId },
-      }),
+      jobTypeId: dto.jobTypeId,
       // 닉네임 부분 일치 검색
       ...(dto.keywords && {
         nickname: { contains: dto.keywords },
@@ -119,7 +116,7 @@ export class ProfileCardsRepository {
       data: {
         userId: user.id,
         nickname: user.nickname,
-        templateId: dto.templateId,
+        jobTypeId: dto.jobTypeId,
         purposeId: dto.purposeId,
         isDefault: true,
         isActive: false,
@@ -140,7 +137,7 @@ export class ProfileCardsRepository {
       data: {
         userId: user.id,
         nickname: defaultCard.nickname,
-        templateId: dto.templateId,
+        jobTypeId: dto.jobTypeId,
         purposeId: dto.purposeId,
         personalityId: defaultCard.personalityId, // 개성은 단일 FK 복사
         isDefault: false,
@@ -182,6 +179,7 @@ export class ProfileCardsRepository {
       affiliation,
       cardImageUrl,
       profileImageUrl,
+      links,
     }: UpdateProfileCardDto,
   ): Promise<UserProfileCard> {
     return this.prismaService.userProfileCard.update({
@@ -211,6 +209,13 @@ export class ProfileCardsRepository {
               data: interestIds.map((interestId) => ({ interestId })),
               skipDuplicates: true,
             },
+          },
+        }),
+        // 링크는 value 가 항목마다 달라 전체 교체(기존 삭제 후 재생성)
+        ...(links !== undefined && {
+          profileCardLinks: {
+            deleteMany: {},
+            create: links.map(({ type, value }) => ({ type, value })),
           },
         }),
       },

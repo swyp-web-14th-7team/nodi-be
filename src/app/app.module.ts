@@ -13,7 +13,9 @@ import { SkillCategoriesModule } from '@/module/skill-categories/skill-categorie
 import { InterestsModule } from '@/module/interests/interests.module';
 import { FilesModule } from '@/module/files/files.module';
 import { JobTypeModule } from '@/module/job-type/job-type.module';
-import { ProfileCardTemplatesModule } from '@/module/profile-card-templates/profile-card-templates.module';
+import { PersonalitiesModule } from '@/module/personalities/personalities.module';
+import { AffiliationStatusesModule } from '@/module/affiliation-statuses/affiliation-statuses.module';
+import { PurposesModule } from '@/module/purposes/purposes.module';
 
 @Module({
   imports: [
@@ -30,7 +32,9 @@ import { ProfileCardTemplatesModule } from '@/module/profile-card-templates/prof
     InterestsModule,
     FilesModule,
     JobTypeModule,
-    ProfileCardTemplatesModule,
+    PersonalitiesModule,
+    AffiliationStatusesModule,
+    PurposesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
