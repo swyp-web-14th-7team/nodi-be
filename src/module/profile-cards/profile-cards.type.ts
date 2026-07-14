@@ -26,6 +26,7 @@ export const displayProfileCardIncludeOptions = {
   },
   personality: true,
   affiliationStatus: true,
+  purpose: true,
   template: {
     include: {
       jobType: {

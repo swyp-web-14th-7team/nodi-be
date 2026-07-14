@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Length,
   Min,
 } from 'class-validator';
 
@@ -50,4 +51,18 @@ export class UpdateProfileCardDto {
   @IsString()
   @IsOptional()
   affiliation?: string;
+
+  @ApiPropertyOptional({ description: '프로필 카드 이미지 URL' })
+  @Length(10, 500)
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  cardImageUrl?: string;
+
+  @ApiPropertyOptional({ description: '프로필 이미지 URL' })
+  @Length(10, 500)
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  profileImageUrl?: string;
 }

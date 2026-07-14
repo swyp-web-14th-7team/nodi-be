@@ -74,10 +74,11 @@ model JobType {
 
 // -------------- 유저 프로필 카드 --------------
 model UserProfileCard {
-  id           String  @id @default(ulid()) @db.Char(26)
-  nickname     String  @db.VarChar(255) // 프로필 카드 닉네임, 기본값은 user.name
-  cardImageUrl String? @map("card_image_url") @db.VarChar(500)
-  description  String  @default("") @db.VarChar(2000)
+  id              String  @id @default(ulid()) @db.Char(26)
+  nickname        String  @db.VarChar(255) // 프로필 카드 닉네임, 기본값은 user.name
+  cardImageUrl    String? @map("card_image_url") @db.VarChar(500) // 프로필 카드 배경 이미지 url
+  profileImageUrl String? @map("profile_image_url") @db.VarChar(500) // 프로필 이미지 url
+  description     String  @default("") @db.VarChar(2000)
 
   userId String @map("user_id") @db.Char(26)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -97,6 +98,10 @@ model UserProfileCard {
   // 카드당 현 소속 상태 하나만 선택
   affiliationStatusId Int?               @map("affiliation_status_id") @db.UnsignedInt
   affiliationStatus   AffiliationStatus? @relation(fields: [affiliationStatusId], references: [id], onDelete: Restrict)
+
+  // 카드당 목적 하나만 선택 (팀 빌딩/친목/커피챗 등)
+  purposeId Int?     @map("purpose_id") @db.UnsignedInt
+  purpose   Purpose? @relation(fields: [purposeId], references: [id], onDelete: Restrict)
 
   // 현 소속 (자유 입력, 100자 이내)
   affiliation String? @db.VarChar(255)
@@ -188,6 +193,16 @@ model AffiliationStatus {
   profileCards UserProfileCard[]
 
   @@map("affiliation_statuses")
+}
+
+// 프로필 카드 목적 선택지 (팀 빌딩/친목/커피챗 등). 카드당 하나 선택
+model Purpose {
+  id   Int    @id @default(autoincrement()) @db.UnsignedInt
+  name String @unique @db.VarChar(100)
+
+  profileCards UserProfileCard[]
+
+  @@map("purposes")
 }
 
 // -------------- 프로필 카드 템플릿 --------------
