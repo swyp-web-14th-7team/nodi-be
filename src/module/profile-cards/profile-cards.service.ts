@@ -8,10 +8,10 @@ import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-
 import { Prisma } from '@/prisma/client';
 import type { User, UserProfileCard } from '@/prisma/client';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
+import { FindPublicProfileCardDto } from '@/module/profile-cards/dto/find-public-profile-card.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
-import { ProfileCardResponse } from '@/module/profile-cards/type/profile-card-response.type';
 
 @Injectable()
 export class ProfileCardsService {
@@ -38,6 +38,22 @@ export class ProfileCardsService {
         userId: user.id,
         cardId,
       });
+    if (!profileCard)
+      throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
+    return profileCard;
+  }
+
+  /** 인증 없이 공개(활성) 프로필 카드 목록 조회 (public) */
+  async findAllPublicProfileCards(
+    dto: FindPublicProfileCardDto,
+  ): Promise<PaginationResult<DisplayProfileCard>> {
+    return this.profileCardsRepository.findManyPublicProfileCards(dto);
+  }
+
+  /** 인증 없이 카드 ID 로 단건 조회 (public) */
+  async findOnePublicProfileCard(cardId: string): Promise<DisplayProfileCard> {
+    const profileCard: DisplayProfileCard | null =
+      await this.profileCardsRepository.findPublicDisplayProfileCard(cardId);
     if (!profileCard)
       throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
     return profileCard;

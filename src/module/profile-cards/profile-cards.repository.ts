@@ -3,6 +3,7 @@ import { PrismaService } from '@/lib/prisma/prisma.service';
 import { Prisma, User, UserProfileCard } from '@/prisma/client';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
+import { FindPublicProfileCardDto } from '@/module/profile-cards/dto/find-public-profile-card.dto';
 import {
   defaultProfileCardIncludeOptions,
   type DefaultUserProfileCard,
@@ -51,6 +52,35 @@ export class ProfileCardsRepository {
     return { total, items };
   }
 
+  /** 공개(활성) 프로필 카드 목록 조회 (필터: purpose/jobType/affiliationStatus, 검색: 닉네임) */
+  async findManyPublicProfileCards(
+    dto: FindPublicProfileCardDto,
+  ): Promise<PaginationResult<DisplayProfileCard>> {
+    const { skip, limit, sort, order } = dto;
+    const where: Prisma.UserProfileCardWhereInput = {
+      isActive: true,
+      // undefined 면 필터 없음, 값이 있으면 해당 값으로 필터
+      purposeId: dto.purpose,
+      affiliationStatusId: dto.affiliationStatusId,
+      jobTypeId: dto.jobTypeId,
+      // 닉네임 부분 일치 검색
+      ...(dto.keywords && {
+        nickname: { contains: dto.keywords },
+      }),
+    };
+    const [total, items] = await Promise.all([
+      this.prismaService.userProfileCard.count({ where }),
+      this.prismaService.userProfileCard.findMany({
+        where,
+        include: displayProfileCardIncludeOptions,
+        skip,
+        take: limit,
+        orderBy: { [sort]: order },
+      }),
+    ]);
+    return { total, items };
+  }
+
   async findOneDisplayProfileCard({
     userId,
     cardId,
@@ -67,6 +97,16 @@ export class ProfileCardsRepository {
     });
   }
 
+  /** 카드 ID 로 단건 조회 (소유자 무관, public 조회용) */
+  async findPublicDisplayProfileCard(
+    cardId: string,
+  ): Promise<DisplayProfileCard | null> {
+    return this.prismaService.userProfileCard.findUnique({
+      where: { id: cardId, isActive: true },
+      include: displayProfileCardIncludeOptions,
+    });
+  }
+
   /** 첫 카드 = 기본(default) 카드 생성 */
   async createDefaultProfileCard(
     user: User,
@@ -76,8 +116,8 @@ export class ProfileCardsRepository {
       data: {
         userId: user.id,
         nickname: user.nickname,
-        templateId: dto.templateId,
-        cardImageUrl: dto.cardImageUrl,
+        jobTypeId: dto.jobTypeId,
+        purposeId: dto.purposeId,
         isDefault: true,
         isActive: false,
       },
@@ -97,8 +137,8 @@ export class ProfileCardsRepository {
       data: {
         userId: user.id,
         nickname: defaultCard.nickname,
-        templateId: dto.templateId,
-        cardImageUrl: dto.cardImageUrl,
+        jobTypeId: dto.jobTypeId,
+        purposeId: dto.purposeId,
         personalityId: defaultCard.personalityId, // 개성은 단일 FK 복사
         isDefault: false,
         isActive: false,
@@ -137,6 +177,9 @@ export class ProfileCardsRepository {
       description,
       affiliationStatusId,
       affiliation,
+      cardImageUrl,
+      profileImageUrl,
+      links,
     }: UpdateProfileCardDto,
   ): Promise<UserProfileCard> {
     return this.prismaService.userProfileCard.update({
@@ -145,6 +188,8 @@ export class ProfileCardsRepository {
         description,
         affiliation,
         affiliationStatusId,
+        cardImageUrl,
+        profileImageUrl,
         ...(personalityId !== undefined && {
           personalityId: personalityId,
         }),
@@ -164,6 +209,13 @@ export class ProfileCardsRepository {
               data: interestIds.map((interestId) => ({ interestId })),
               skipDuplicates: true,
             },
+          },
+        }),
+        // 링크는 value 가 항목마다 달라 전체 교체(기존 삭제 후 재생성)
+        ...(links !== undefined && {
+          profileCardLinks: {
+            deleteMany: {},
+            create: links.map(({ type, value }) => ({ type, value })),
           },
         }),
       },

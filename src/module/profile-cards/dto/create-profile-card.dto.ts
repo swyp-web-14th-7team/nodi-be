@@ -1,23 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Length,
-  Min,
-} from 'class-validator';
+import { IsNumber, IsOptional, Min } from 'class-validator';
 
 export class CreateProfileCardDto {
-  @ApiProperty({ description: '템플릿 ID (number)' })
+  @ApiProperty({ description: '직군(jobType) ID (number)' })
   @Min(1)
   @IsNumber()
-  templateId: number;
+  jobTypeId: number;
 
-  @ApiPropertyOptional({ description: '프로필 카드 이미지 URL' })
-  @Length(10, 500)
-  @IsString()
-  @IsNotEmpty()
+  @ApiPropertyOptional({ description: '목적 ID (팀 빌딩/친목/커피챗 등)' })
+  @Min(1)
+  @IsNumber()
   @IsOptional()
-  cardImageUrl?: string;
+  purposeId?: number;
 }

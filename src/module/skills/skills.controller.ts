@@ -47,16 +47,6 @@ export class SkillsController {
   }
 
   /**
-   * skill 단건 조회
-   */
-  @Get(':id')
-  @ApiResponseSuccess(SkillResponse)
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<SkillResponse> {
-    const skill = await this.skillsService.findById(id);
-    return SkillResponse.fromSkill(skill);
-  }
-
-  /**
    * skill 생성 (ADMIN)
    */
   @Post()
