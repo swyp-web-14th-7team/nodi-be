@@ -14,7 +14,7 @@ model User {
   name            String  @db.VarChar(255) // 실제 본명 (소셜 로그인 시 딸려오는 이름)
   nickname        String  @db.VarChar(255) // 서비스에서 사용할 닉네임
   email           String  @unique @db.VarChar(255) // 소셜 로그인 이메일 (중복 불가) 소프트 딜리트 시 deleted-{id}-{email} 형식으로 변경된다. TODO: 길이 초과되면 어떻할지 정하기! -> 그냥 해시해서 저장하자!
-  profileImageUrl String? @map("profile_image_url") @db.VarChar(500)
+  profileImageUrl String? @map("profile_image_url") @db.VarChar(500) // TODO: 안쓰면 제거해도 될듯?
   role            Int     @default(0) @db.TinyInt // 0: 일반 유저, 1: ADMIN
 
   createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)

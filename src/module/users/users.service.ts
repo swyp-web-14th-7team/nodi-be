@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { UserRole } from '@/common/enum/user-role.enum';
 import { LoginParams } from '@/module/users/type/login-params.type';
 import { Prisma } from '@/prisma/client';
+import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -22,6 +23,13 @@ export class UsersService {
   ): Promise<User | null> {
     return this.prismaService.user.findUnique({
       where: { ...whereOptions, deletedAt: null },
+    });
+  }
+
+  async updateMyProfile(user: User, dto: UpdateProfileDto): Promise<User> {
+    return this.prismaService.user.update({
+      where: { id: user.id },
+      data: { ...dto },
     });
   }
 
