@@ -167,6 +167,16 @@ const INTEREST_SEED: string[] = [
 ];
 
 /**
+ * 직무(직군) 시드 데이터 (JobType.name 은 unique, 프로필 카드가 참조)
+ */
+const JOB_TYPE_SEED: string[] = [
+  '프론트 개발자',
+  '백엔드 개발자',
+  '디자이너',
+  'PM',
+];
+
+/**
  * 프로필 카드 목적 시드 데이터 (카드당 하나 선택, Purpose.name 은 unique)
  */
 const PURPOSE_SEED: string[] = [
@@ -269,6 +279,16 @@ async function main() {
   }
   console.log(`  [관심사] ${INTEREST_SEED.length}개 시드 완료`);
 
+  // 직무(직군) upsert
+  for (const jobTypeName of JOB_TYPE_SEED) {
+    await prisma.jobType.upsert({
+      where: { name: jobTypeName },
+      update: {},
+      create: { name: jobTypeName },
+    });
+  }
+  console.log(`  [직무] ${JOB_TYPE_SEED.length}개 시드 완료`);
+
   // 목적 upsert
   for (const purposeName of PURPOSE_SEED) {
     await prisma.purpose.upsert({
@@ -301,8 +321,8 @@ async function main() {
 
   console.log(
     `\n✅ 카테고리 ${categoryCount}개 / 스킬 ${skillCount}개 / 관심사 ${INTEREST_SEED.length}개 / ` +
-      `목적 ${PURPOSE_SEED.length}개 / 소속 상태 ${AFFILIATION_STATUS_SEED.length}개 / ` +
-      `개성 ${PERSONALITY_SEED.length}개 시드 완료`,
+      `직무 ${JOB_TYPE_SEED.length}개 / 목적 ${PURPOSE_SEED.length}개 / ` +
+      `소속 상태 ${AFFILIATION_STATUS_SEED.length}개 / 개성 ${PERSONALITY_SEED.length}개 시드 완료`,
   );
 }
 
