@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/lib/prisma/prisma.service';
 import { Prisma, User, UserProfileCard } from '@/prisma/client';
@@ -12,6 +13,9 @@ import {
 } from '@/module/profile-cards/profile-cards.type';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
+
+/** QR 공유 토큰(16byte hex). 추측/열거가 불가능해야 하므로 CSPRNG 를 쓴다. */
+const generateShareToken = (): string => randomBytes(16).toString('hex');
 
 @Injectable()
 export class ProfileCardsRepository {
@@ -52,7 +56,7 @@ export class ProfileCardsRepository {
     return { total, items };
   }
 
-  /** 공개(활성) 프로필 카드 목록 조회 (필터: purpose/jobType/affiliationStatus, 검색: 닉네임) */
+  /** 공개(활성) 프로필 카드 목록 조회 (필터: purpose/jobType/affiliationStatus, 검색: 닉네임/관심사) */
   async findManyPublicProfileCards(
     dto: FindPublicProfileCardDto,
   ): Promise<PaginationResult<DisplayProfileCard>> {
@@ -63,9 +67,16 @@ export class ProfileCardsRepository {
       purposeId: dto.purpose,
       affiliationStatusId: dto.affiliationStatusId,
       jobTypeId: dto.jobTypeId,
-      // 닉네임 부분 일치 검색
+      // 닉네임 또는 관심사 이름 부분 일치 검색
       ...(dto.keywords && {
-        nickname: { contains: dto.keywords },
+        OR: [
+          { nickname: { contains: dto.keywords } },
+          {
+            profileCardInterests: {
+              some: { interest: { name: { contains: dto.keywords } } },
+            },
+          },
+        ],
       }),
     };
     const [total, items] = await Promise.all([
@@ -107,6 +118,27 @@ export class ProfileCardsRepository {
     });
   }
 
+  /**
+   * QR 공유 토큰으로 단건 조회 (QR 조회용)
+   * 토큰 자체가 접근 권한이므로 isActive 를 보지 않는다 (비공개 카드도 조회됨)
+   */
+  async findSharedDisplayProfileCard(
+    shareToken: string,
+  ): Promise<DisplayProfileCard | null> {
+    return this.prismaService.userProfileCard.findUnique({
+      where: { shareToken },
+      include: displayProfileCardIncludeOptions,
+    });
+  }
+
+  /** 공유 토큰 재발급 — 기존에 뿌려진 QR 은 전부 무효가 된다 */
+  async updateShareToken(id: string): Promise<UserProfileCard> {
+    return this.prismaService.userProfileCard.update({
+      where: { id },
+      data: { shareToken: generateShareToken() },
+    });
+  }
+
   /** 첫 카드 = 기본(default) 카드 생성 */
   async createDefaultProfileCard(
     user: User,
@@ -116,6 +148,7 @@ export class ProfileCardsRepository {
       data: {
         userId: user.id,
         nickname: user.nickname,
+        shareToken: generateShareToken(),
         jobTypeId: dto.jobTypeId,
         purposeId: dto.purposeId,
         isDefault: true,
@@ -137,6 +170,8 @@ export class ProfileCardsRepository {
       data: {
         userId: user.id,
         nickname: defaultCard.nickname,
+        // 토큰은 카드마다 고유해야 하므로 default 카드에서 복사하지 않고 새로 발급
+        shareToken: generateShareToken(),
         jobTypeId: dto.jobTypeId,
         purposeId: dto.purposeId,
         personalityId: defaultCard.personalityId, // 개성은 단일 FK 복사

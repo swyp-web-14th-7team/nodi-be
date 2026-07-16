@@ -27,7 +27,8 @@ export class SkillsController {
   /**
    * skill 목록 조회
    * @remarks
-   * categoryId 를 넘기면 해당 카테고리의 skill 만, search 를 넘기면 name 부분 일치로 필터링합니다. (생략 시 전체)
+   * categoryId 를 넘기면 해당 카테고리의 skill 만, jobTypeId 를 넘기면 해당 직군에 매핑된 skill 만,
+   * search 를 넘기면 name 부분 일치로 필터링합니다. (생략 시 전체, 여러 개를 함께 넘기면 AND)
    *
    * sort 는 id·name 만 허용하며 기본값은 name 입니다.
    */
@@ -48,6 +49,9 @@ export class SkillsController {
 
   /**
    * skill 생성 (ADMIN)
+   * @remarks
+   * jobTypeIds 로 이 스킬이 속한 직군을 함께 지정합니다. 빈 배열은 허용하지 않으며,
+   * 전 직군 공통 스킬이면 모든 직군 ID 를 넣습니다.
    */
   @Post()
   @Auth(UserRole.ADMIN)
@@ -59,6 +63,9 @@ export class SkillsController {
 
   /**
    * skill 수정 (ADMIN)
+   * @remarks
+   * 넘긴 필드만 수정합니다. jobTypeIds 를 넘기면 직군 매핑을 그 목록으로 통째로 교체하고,
+   * 생략하면 기존 매핑을 그대로 둡니다.
    */
   @Patch(':id')
   @Auth(UserRole.ADMIN)

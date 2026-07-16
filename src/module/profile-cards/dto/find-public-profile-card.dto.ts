@@ -34,7 +34,7 @@ export class FindPublicProfileCardDto extends PaginationDto {
   @IsOptional()
   affiliationStatusId?: number;
 
-  @ApiPropertyOptional({ description: '검색 키워드' })
+  @ApiPropertyOptional({ description: '검색 키워드 (닉네임 / 관심사 이름)' })
   @IsString()
   @IsNotEmpty()
   @IsOptional()

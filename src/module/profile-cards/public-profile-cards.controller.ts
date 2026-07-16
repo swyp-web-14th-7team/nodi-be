@@ -13,6 +13,27 @@ export class PublicProfileCardsController {
   constructor(private readonly profileCardsService: ProfileCardsService) {}
 
   /**
+   * QR 공유 토큰으로 프로필 카드 조회 (public)
+   *
+   * @remarks
+   * 인증 없이 QR 공유 토큰으로 프로필 카드를 조회합니다. (QR 스캔용)
+   *
+   * 토큰을 가진 것 자체가 접근 권한이므로, 목록에 노출되지 않는
+   * 비공개(isActive=false) 카드도 이 경로로는 조회됩니다.
+   * @param token
+   */
+  @Get('share/:token')
+  @ApiResponseSuccess(ProfileCardResponse)
+  @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
+  async getSharedProfileCard(
+    @Param('token') token: string,
+  ): Promise<ProfileCardResponse> {
+    const item: DisplayProfileCard =
+      await this.profileCardsService.findOneSharedProfileCard(token);
+    return ProfileCardResponse.fromProfileCard(item);
+  }
+
+  /**
    * 프로필 카드 단건 조회 (public)
    *
    * @remarks
