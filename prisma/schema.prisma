@@ -74,7 +74,12 @@ model JobType {
 
 // -------------- 유저 프로필 카드 --------------
 model UserProfileCard {
-  id              String  @id @default(ulid()) @db.Char(26)
+  id String @id @default(ulid()) @db.Char(26)
+  // QR 공유용 비밀 토큰. 이 토큰으로 접근하면 isActive 와 무관하게 조회된다.
+  // id 는 공개 목록 API 로 노출되므로 접근 권한으로 쓸 수 없어 별도 값이 필요하다.
+  // collation 이 utf8mb4_unicode_ci(대소문자 무시)라 대소문자 모호성이 없는 hex 를 쓴다.
+  shareToken String @unique @map("share_token") @db.Char(32)
+
   nickname        String  @db.VarChar(255) // 프로필 카드 닉네임, 기본값은 user.name
   cardImageUrl    String? @map("card_image_url") @db.VarChar(500) // 프로필 카드 배경 이미지 url
   profileImageUrl String? @map("profile_image_url") @db.VarChar(500) // 프로필 이미지 url

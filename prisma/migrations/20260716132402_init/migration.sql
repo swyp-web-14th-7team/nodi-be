@@ -54,19 +54,23 @@ CREATE TABLE `job_types` (
 -- CreateTable
 CREATE TABLE `user_profile_cards` (
     `id` CHAR(26) NOT NULL,
+    `share_token` CHAR(32) NOT NULL,
     `nickname` VARCHAR(255) NOT NULL,
     `card_image_url` VARCHAR(500) NULL,
+    `profile_image_url` VARCHAR(500) NULL,
     `description` VARCHAR(2000) NOT NULL DEFAULT '',
     `user_id` CHAR(26) NOT NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL,
     `is_active` BOOLEAN NOT NULL DEFAULT true,
     `is_default` BOOLEAN NULL,
-    `template_id` INTEGER UNSIGNED NULL,
+    `job_type_id` INTEGER UNSIGNED NOT NULL,
     `personality_id` INTEGER UNSIGNED NULL,
     `affiliation_status_id` INTEGER UNSIGNED NULL,
+    `purpose_id` INTEGER UNSIGNED NULL,
     `affiliation` VARCHAR(255) NULL,
 
+    UNIQUE INDEX `user_profile_cards_share_token_key`(`share_token`),
     UNIQUE INDEX `user_profile_cards_user_id_is_default_key`(`user_id`, `is_default`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -137,34 +141,21 @@ CREATE TABLE `affiliation_statuses` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `profile_card_templates` (
+CREATE TABLE `purposes` (
     `id` INTEGER UNSIGNED NOT NULL AUTO_INCREMENT,
-    `job_type_id` INTEGER UNSIGNED NOT NULL,
-    `version` INTEGER NOT NULL DEFAULT 1,
+    `name` VARCHAR(100) NOT NULL,
 
-    UNIQUE INDEX `profile_card_templates_job_type_id_version_key`(`job_type_id`, `version`),
+    UNIQUE INDEX `purposes_name_key`(`name`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `profile_card_template_items` (
+CREATE TABLE `profile_card_links` (
     `id` INTEGER UNSIGNED NOT NULL AUTO_INCREMENT,
-    `label` VARCHAR(255) NOT NULL,
-    `description` VARCHAR(2000) NOT NULL,
-    `type` TINYINT NOT NULL,
-    `template_id` INTEGER UNSIGNED NOT NULL,
-
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `profile_card_items` (
-    `id` INTEGER UNSIGNED NOT NULL AUTO_INCREMENT,
-    `value` JSON NOT NULL,
     `profile_card_id` CHAR(26) NOT NULL,
-    `template_item_id` INTEGER UNSIGNED NOT NULL,
+    `type` TINYINT NOT NULL,
+    `value` VARCHAR(500) NOT NULL,
 
-    UNIQUE INDEX `profile_card_items_profile_card_id_template_item_id_key`(`profile_card_id`, `template_item_id`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -199,13 +190,16 @@ ALTER TABLE `refresh_tokens` ADD CONSTRAINT `refresh_tokens_user_id_fkey` FOREIG
 ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_template_id_fkey` FOREIGN KEY (`template_id`) REFERENCES `profile_card_templates`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_job_type_id_fkey` FOREIGN KEY (`job_type_id`) REFERENCES `job_types`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_personality_id_fkey` FOREIGN KEY (`personality_id`) REFERENCES `personalities`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_affiliation_status_id_fkey` FOREIGN KEY (`affiliation_status_id`) REFERENCES `affiliation_statuses`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `user_profile_cards` ADD CONSTRAINT `user_profile_cards_purpose_id_fkey` FOREIGN KEY (`purpose_id`) REFERENCES `purposes`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `profile_card_interests` ADD CONSTRAINT `profile_card_interests_profile_card_id_fkey` FOREIGN KEY (`profile_card_id`) REFERENCES `user_profile_cards`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
@@ -226,16 +220,7 @@ ALTER TABLE `profile_card_skills` ADD CONSTRAINT `profile_card_skills_skill_id_f
 ALTER TABLE `personalities` ADD CONSTRAINT `personalities_job_type_id_fkey` FOREIGN KEY (`job_type_id`) REFERENCES `job_types`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `profile_card_templates` ADD CONSTRAINT `profile_card_templates_job_type_id_fkey` FOREIGN KEY (`job_type_id`) REFERENCES `job_types`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `profile_card_template_items` ADD CONSTRAINT `profile_card_template_items_template_id_fkey` FOREIGN KEY (`template_id`) REFERENCES `profile_card_templates`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `profile_card_items` ADD CONSTRAINT `profile_card_items_profile_card_id_fkey` FOREIGN KEY (`profile_card_id`) REFERENCES `user_profile_cards`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `profile_card_items` ADD CONSTRAINT `profile_card_items_template_item_id_fkey` FOREIGN KEY (`template_item_id`) REFERENCES `profile_card_template_items`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `profile_card_links` ADD CONSTRAINT `profile_card_links_profile_card_id_fkey` FOREIGN KEY (`profile_card_id`) REFERENCES `user_profile_cards`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `collection_groups` ADD CONSTRAINT `collection_groups_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

@@ -59,6 +59,42 @@ export class ProfileCardsService {
     return profileCard;
   }
 
+  /**
+   * QR 공유 토큰으로 단건 조회 (public)
+   * 토큰을 가진 것 자체가 접근 권한이라 비공개(isActive=false) 카드도 조회된다.
+   */
+  async findOneSharedProfileCard(
+    shareToken: string,
+  ): Promise<DisplayProfileCard> {
+    const profileCard: DisplayProfileCard | null =
+      await this.profileCardsRepository.findSharedDisplayProfileCard(
+        shareToken,
+      );
+    if (!profileCard)
+      throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
+    return profileCard;
+  }
+
+  /** 공유 토큰 조회 (소유자 전용) */
+  async findShareToken(user: User, cardId: string): Promise<string> {
+    const target: UserProfileCard | null =
+      await this.profileCardsRepository.findUniqueProfileCard({ id: cardId });
+    if (!target || target.userId !== user.id)
+      throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
+    return target.shareToken;
+  }
+
+  /** 공유 토큰 재발급 (소유자 전용) — 기존 QR 무효화 */
+  async updateShareToken(user: User, cardId: string): Promise<string> {
+    const target: UserProfileCard | null =
+      await this.profileCardsRepository.findUniqueProfileCard({ id: cardId });
+    if (!target || target.userId !== user.id)
+      throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
+    const updated: UserProfileCard =
+      await this.profileCardsRepository.updateShareToken(cardId);
+    return updated.shareToken;
+  }
+
   async createProfileCard(
     user: User,
     dto: CreateProfileCardDto,
