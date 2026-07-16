@@ -130,6 +130,54 @@ const SKILL_SEED: Record<string, string[]> = {
 };
 
 /**
+ * 카테고리 단위 기본 직군 매핑.
+ * 저장은 스킬 단위(skill_job_types)로 펼쳐지고, 여기서는 시드 소스만 압축한다.
+ * 카테고리 기본값으로 안 맞는 스킬은 아래 SKILL_JOB_TYPE_OVERRIDES 에 개별로 적는다.
+ */
+const CATEGORY_JOB_TYPES: Record<string, string[]> = {
+  '프로그래밍 언어': ['백엔드 개발자'],
+  '프레임워크·라이브러리': ['프론트 개발자'],
+  데이터베이스: ['백엔드 개발자'],
+  '데브옵스·인프라': ['백엔드 개발자'],
+  '버전 관리': ['프론트 개발자', '백엔드 개발자'],
+  '디자인 툴': ['디자이너'],
+  // 협업 툴은 전 직군 공통 — 직군 수만큼 행을 모두 넣는다
+  '협업 툴': ['프론트 개발자', '백엔드 개발자', '디자이너', 'PM'],
+  '기획·데이터 분석': ['PM'],
+};
+
+/**
+ * 스킬별 직군 매핑 예외 (지정 시 카테고리 기본값을 완전히 대체)
+ */
+const SKILL_JOB_TYPE_OVERRIDES: Record<string, string[]> = {
+  // 프로그래밍 언어 — 기본값(백엔드)에 안 맞는 것들
+  JavaScript: ['프론트 개발자', '백엔드 개발자'],
+  TypeScript: ['프론트 개발자', '백엔드 개발자'],
+  Swift: ['프론트 개발자'],
+  Dart: ['프론트 개발자'],
+  'HTML/CSS': ['프론트 개발자', '디자이너'],
+  SQL: ['백엔드 개발자', 'PM'],
+
+  // 프레임워크·라이브러리 — 기본값(프론트)에 안 맞는 백엔드 것들
+  'Node.js': ['백엔드 개발자'],
+  NestJS: ['백엔드 개발자'],
+  Express: ['백엔드 개발자'],
+  'Spring Boot': ['백엔드 개발자'],
+  Spring: ['백엔드 개발자'],
+  Django: ['백엔드 개발자'],
+  FastAPI: ['백엔드 개발자'],
+  Flask: ['백엔드 개발자'],
+
+  // 데브옵스·인프라 — 프론트도 직접 다루는 배포 플랫폼
+  Vercel: ['프론트 개발자', '백엔드 개발자'],
+  Netlify: ['프론트 개발자', '백엔드 개발자'],
+
+  // 디자인 툴 — 디자이너 외 직군도 쓰는 것들
+  Figma: ['디자이너', 'PM'],
+  Zeplin: ['디자이너', '프론트 개발자'],
+};
+
+/**
  * 관심사 시드 데이터 (프로필 카드의 관심사 태그)
  * 개발/디자인/기획 직군이 붙일 법한 직무·개인 관심사 (Interest.name 은 unique)
  */
@@ -246,6 +294,30 @@ const PERSONALITY_SEED: { name: string; description: string }[] = [
 async function main() {
   let categoryCount = 0;
   let skillCount = 0;
+  let skillJobTypeCount = 0;
+
+  // 직무(직군) 를 먼저 upsert — 스킬 매핑이 직군 id 를 참조한다
+  const jobTypeIdByName = new Map<string, number>();
+  for (const jobTypeName of JOB_TYPE_SEED) {
+    const jobType = await prisma.jobType.upsert({
+      where: { name: jobTypeName },
+      update: {},
+      create: { name: jobTypeName },
+    });
+    jobTypeIdByName.set(jobTypeName, jobType.id);
+  }
+  console.log(`  [직무] ${JOB_TYPE_SEED.length}개 시드 완료`);
+
+  /** 직군 이름 목록 → id 목록. 오타는 조용히 넘기지 않고 즉시 실패시킨다. */
+  const toJobTypeIds = (names: string[], context: string): number[] =>
+    names.map((name) => {
+      const id = jobTypeIdByName.get(name);
+      if (id === undefined)
+        throw new Error(
+          `${context}: 알 수 없는 직군 이름 '${name}' (JOB_TYPE_SEED 에 없음)`,
+        );
+      return id;
+    });
 
   for (const [categoryName, skills] of Object.entries(SKILL_SEED)) {
     // 카테고리 upsert (재실행해도 중복 생성 안 함)
@@ -256,18 +328,38 @@ async function main() {
     });
     categoryCount += 1;
 
+    const categoryJobTypes = CATEGORY_JOB_TYPES[categoryName];
+    if (!categoryJobTypes)
+      throw new Error(
+        `CATEGORY_JOB_TYPES 에 '${categoryName}' 의 기본 직군이 없습니다.`,
+      );
+
     for (const skillName of skills) {
       // 스킬 upsert — 이미 있으면 카테고리만 최신화
-      await prisma.skill.upsert({
+      const skill = await prisma.skill.upsert({
         where: { name: skillName },
         update: { categoryId: category.id },
         create: { name: skillName, categoryId: category.id },
       });
       skillCount += 1;
+
+      // 예외가 있으면 카테고리 기본값을 완전히 대체
+      const jobTypeIds = toJobTypeIds(
+        SKILL_JOB_TYPE_OVERRIDES[skillName] ?? categoryJobTypes,
+        `스킬 '${skillName}'`,
+      );
+
+      // 시드를 매핑의 단일 진실로 삼는다 — 시드에서 뺀 매핑이 DB 에 남지 않도록 교체
+      await prisma.skillJobType.deleteMany({ where: { skillId: skill.id } });
+      await prisma.skillJobType.createMany({
+        data: jobTypeIds.map((jobTypeId) => ({ skillId: skill.id, jobTypeId })),
+      });
+      skillJobTypeCount += jobTypeIds.length;
     }
 
     console.log(`  [${categoryName}] 스킬 ${skills.length}개 시드 완료`);
   }
+  console.log(`  [스킬-직군 매핑] ${skillJobTypeCount}개 시드 완료`);
 
   // 관심사 upsert (재실행해도 중복 생성 안 함)
   for (const interestName of INTEREST_SEED) {
@@ -278,16 +370,6 @@ async function main() {
     });
   }
   console.log(`  [관심사] ${INTEREST_SEED.length}개 시드 완료`);
-
-  // 직무(직군) upsert
-  for (const jobTypeName of JOB_TYPE_SEED) {
-    await prisma.jobType.upsert({
-      where: { name: jobTypeName },
-      update: {},
-      create: { name: jobTypeName },
-    });
-  }
-  console.log(`  [직무] ${JOB_TYPE_SEED.length}개 시드 완료`);
 
   // 목적 upsert
   for (const purposeName of PURPOSE_SEED) {

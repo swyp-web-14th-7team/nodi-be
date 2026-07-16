@@ -68,13 +68,14 @@ model JobType {
   name          String            @unique @db.VarChar(100) // 이 값은 수정할 수 없음. 다른게 필요하다면 새로 생성할 것.
   personalities Personality[]
   profileCards  UserProfileCard[]
+  skillJobTypes SkillJobType[]
 
   @@map("job_types")
 }
 
 // -------------- 유저 프로필 카드 --------------
 model UserProfileCard {
-  id String @id @default(ulid()) @db.Char(26)
+  id         String @id @default(ulid()) @db.Char(26)
   // QR 공유용 비밀 토큰. 이 토큰으로 접근하면 isActive 와 무관하게 조회된다.
   // id 는 공개 목록 API 로 노출되므로 접근 권한으로 쓸 수 없어 별도 값이 필요하다.
   // collation 이 utf8mb4_unicode_ci(대소문자 무시)라 대소문자 모호성이 없는 hex 를 쓴다.
@@ -160,8 +161,26 @@ model Skill {
   category   SkillCategory @relation(fields: [categoryId], references: [id])
 
   profileCardSkills ProfileCardSkill[]
+  skillJobTypes     SkillJobType[]
 
   @@map("skills")
+}
+
+/**
+ * 스킬 ↔ 직군 매핑 (한 스킬이 여러 직군에 속할 수 있음)
+ * 카탈로그성 마스터 데이터라 행 수 상한이 스킬 수 × 직군 수로 고정된다 (현재 시드 기준 134행).
+ * 전 직군 공통 스킬은 "행 없음"으로 두지 않고 직군 수만큼 행을 모두 넣는다 —
+ * 행이 없는 상태는 "아직 매핑하지 않음"과 구분되지 않기 때문.
+ */
+model SkillJobType {
+  skillId Int   @map("skill_id") @db.UnsignedInt
+  skill   Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  jobTypeId Int     @map("job_type_id") @db.UnsignedInt
+  jobType   JobType @relation(fields: [jobTypeId], references: [id], onDelete: Restrict)
+
+  @@id([skillId, jobTypeId])
+  @@map("skill_job_types")
 }
 
 model ProfileCardSkill {

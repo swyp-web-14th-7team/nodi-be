@@ -15,6 +15,16 @@ export class FindSkillsDto extends PaginationDto {
   @Min(1)
   categoryId?: number;
 
+  @ApiPropertyOptional({
+    description:
+      '직군 ID 로 필터 (해당 직군에 매핑된 스킬만, 생략 시 전체 조회)',
+  })
+  @Type(() => Number) // 쿼리스트링은 문자열이라 number 로 변환
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  jobTypeId?: number;
+
   @ApiPropertyOptional({ description: 'name 검색어 (부분 일치)' })
   @IsString()
   @IsOptional()
