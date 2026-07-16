@@ -48,12 +48,12 @@ export class PersonalitiesRepository {
   async updatePersonality(id: number, dto: UpdatePersonalityDto) {
     const { name, description, jobTypeId, imageUrl } = dto;
     const data: Prisma.PersonalityUpdateInput = {
-      ...(name !== undefined ? { name } : {}),
-      ...(description !== undefined ? { description } : {}),
-      ...(imageUrl !== undefined ? { imageUrl } : {}),
-      ...(jobTypeId !== undefined
-        ? { jobType: { connect: { id: jobTypeId } } }
-        : {}),
+      ...(name !== undefined && { name }),
+      ...(description !== undefined && { description }),
+      ...(imageUrl !== undefined && { imageUrl }),
+      ...(jobTypeId !== undefined && {
+        jobType: { connect: { id: jobTypeId } },
+      }),
     };
     return this.prismaService.personality.update({ where: { id }, data });
   }

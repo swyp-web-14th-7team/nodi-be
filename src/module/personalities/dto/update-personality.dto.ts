@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUrl,
   Length,
   Min,
 } from 'class-validator';
@@ -32,6 +33,7 @@ export class UpdatePersonalityDto {
   jobTypeId?: number;
 
   @ApiPropertyOptional()
+  @IsUrl()
   @IsString()
   @IsOptional()
   @Length(1, 500)

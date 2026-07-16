@@ -52,7 +52,7 @@ export class ProfileCardsRepository {
     return { total, items };
   }
 
-  /** 공개(활성) 프로필 카드 목록 조회 (필터: purpose/jobType/affiliationStatus, 검색: 닉네임) */
+  /** 공개(활성) 프로필 카드 목록 조회 (필터: purpose/jobType/affiliationStatus, 검색: 닉네임/관심사) */
   async findManyPublicProfileCards(
     dto: FindPublicProfileCardDto,
   ): Promise<PaginationResult<DisplayProfileCard>> {
@@ -63,9 +63,16 @@ export class ProfileCardsRepository {
       purposeId: dto.purpose,
       affiliationStatusId: dto.affiliationStatusId,
       jobTypeId: dto.jobTypeId,
-      // 닉네임 부분 일치 검색
+      // 닉네임 또는 관심사 이름 부분 일치 검색
       ...(dto.keywords && {
-        nickname: { contains: dto.keywords },
+        OR: [
+          { nickname: { contains: dto.keywords } },
+          {
+            profileCardInterests: {
+              some: { interest: { name: { contains: dto.keywords } } },
+            },
+          },
+        ],
       }),
     };
     const [total, items] = await Promise.all([
