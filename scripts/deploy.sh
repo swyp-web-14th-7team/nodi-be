@@ -4,7 +4,7 @@
 #
 # 흐름:
 #   1) 현재 활성 색 파악 (nginx/active/upstream.conf 에서 읽음)
-#   2) 반대 색을 새 이미지로 빌드·기동
+#   2) 반대 색을 새 이미지로 기동
 #   3) 새 색 헬스체크 (★ 전환 전에! 모든 replica 가 healthy 될 때까지)
 #        실패 → 새 색 종료, 배포 취소 (현재 색 무사 = 사용자 영향 0)
 #   4) upstream.conf 를 새 색으로 교체
@@ -13,10 +13,16 @@
 #        실패 → upstream 롤백 + reload, 새 색 종료 (현재 색 복귀)
 #   7) 이전 색 종료
 #
-# 최초 부팅(둘 다 없을 때)은 먼저 아래로 blue+nginx 를 띄운 뒤 이 스크립트를 사용:
-#   docker compose up -d --build      # blue + nginx
+# 최초 부팅(둘 다 없을 때)은 먼저 아래로 띄운 뒤 이 스크립트를 사용:
+#   docker compose up -d              # blue + nginx + 로그 수집 스택(loki/alloy/grafana)
 #
-# 사용법:  ./scripts/deploy.sh
+# 사용법:
+#   docker compose pull               # ★ 먼저! GHCR 에서 새 이미지를 받아둘 것
+#   ./scripts/deploy.sh
+#
+# ★ 이 스크립트는 pull 하지 않는다. 받아둔 로컬 이미지로만 배포하므로,
+#   pull 을 빼먹으면 옛 이미지가 그대로 다시 뜨고 헬스체크·스모크 테스트는 통과한다
+#   (= 배포된 줄 알지만 코드는 그대로). compose 는 캐시된 태그를 다시 받지 않음.
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -54,10 +60,10 @@ NEXT_PROFILE=$(profile_args "$NEXT")
 
 log "현재 활성: $CURRENT  →  새로 배포: $NEXT"
 
-# ── 2) 새 색 빌드 & 기동 ──────────────────────────────────────
-log "$NEXT_SVC 빌드·기동..."
+# ── 2) 새 색 기동 ─────────────────────────────────────────────
+log "$NEXT_SVC 기동..."
 # shellcheck disable=SC2086
-docker compose $NEXT_PROFILE up -d --build "$NEXT_SVC"
+docker compose $NEXT_PROFILE up -d "$NEXT_SVC"
 
 # ── 3) 새 색 헬스체크 (전환 전!) ──────────────────────────────
 log "$NEXT_SVC 헬스체크 대기 (최대 ${HEALTH_TIMEOUT}s, replica 전체 healthy 필요)..."

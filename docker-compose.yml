@@ -119,16 +119,18 @@ volumes:
 #   - 색 표기: blue ↔ green 핑퐁. 아래 명령에서 색 이름만 바꿔서 사용.
 #   - ★ profile 주의: green 은 항상 '--profile green' 필요, blue 는 불필요.
 #
-# [최초 1회] blue + nginx 기동
-#   docker compose up -d --build
+# [최초 1회] blue + nginx + 로그 수집 스택(loki/alloy/grafana) 기동
+#   docker compose up -d
 #
 # [배포]  새 코드를 "다음색"으로 올림 (예: 현재 green 활성 → blue 로 배포)
 # 1. 현재 활성 색 확인
 #   cat nginx/active/upstream.conf            # set $upstream backend_green:3000; → green 활성
-# 2. 다음색을 새 코드로 빌드·재생성  (★ start 아님! 항상 up --build)
-#   docker compose up -d --build backend_blue
-#   - stop 돼 있던(옛 코드) 다음색을 새 이미지로 갈아끼움. green 차례면:
-#       docker compose --profile green up -d --build backend_green
+# 2. 다음색을 새 이미지로 재생성  (★ start 아님! 새 이미지는 pull 로만 들어옴)
+#   docker compose pull backend_blue          # ★ 이걸 빼면 캐시된 옛 이미지가 그대로 뜸
+#   docker compose up -d backend_blue
+#   - stop 돼 있던(옛 이미지) 다음색을 새 이미지로 갈아끼움. green 차례면:
+#       docker compose --profile green pull backend_green
+#       docker compose --profile green up -d backend_green
 # 3. ★ 다음색 헬스체크 (전환 전 필수! replica 전체 healthy 확인)
 #   docker compose ps                         # backend_blue 모두 (healthy) 될 때까지 대기
 #   - healthy 안 되면 전환하지 말고 다음색 제거 후 배포 취소:
@@ -142,7 +144,7 @@ volumes:
 #   ※ 완료. 코드 문제는 배포 후 모니터링으로 발견 → 아래 롤백 사용
 #
 # [롤백]  배포 후 문제 발견 시, 직전 stop 된 색으로 복귀 (예: blue 활성 → green 복귀)
-# 1. 이전색 재가동  (★ up --build 아님! 옛 코드 그대로 start)
+# 1. 이전색 재가동  (★ pull/up -d 아님! 옛 이미지로 만들어진 컨테이너를 그대로 start)
 #   docker compose --profile green start backend_green
 # 2. ★ 이전색 헬스체크 (재가동된 색이 healthy 될 때까지 대기)
 #   docker compose --profile green ps         # backend_green (healthy) 확인
@@ -153,6 +155,6 @@ volumes:
 # 5. 문제 색(현재 활성이던 색) 정지
 #   docker compose stop backend_blue
 #
-# ※ 핵심 구분: 배포=up --build(새 코드) / 롤백=start(옛 코드 그대로)
-# ※ stop 된 이전색은 다음 배포 때 up --build 로 덮어써짐 = 직전 1버전만 롤백 가능
+# ※ 핵심 구분: 배포=pull + up -d(새 이미지) / 롤백=start(옛 이미지 그대로)
+# ※ stop 된 이전색은 다음 배포 때 up -d 로 덮어써짐 = 직전 1버전만 롤백 가능
 # ─────────────────────────────────────────────
