@@ -1,0 +1,13 @@
+# /etc/grafana/dashboards 의 JSON 을 기동 시 자동 등록.
+# 파일을 고치면 updateIntervalSeconds 주기로 반영됨 (재시작 불필요).
+apiVersion: 1
+
+providers:
+  - name: nodi-be
+    type: file
+    # UI 에서 수정·저장 못 하게 막음. 파일이 유일한 원본이 되도록.
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false
