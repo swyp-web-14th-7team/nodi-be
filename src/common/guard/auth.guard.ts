@@ -58,7 +58,9 @@ export class AuthGuard implements CanActivate {
     });
     if (!user) throw new UnauthorizedException('인증에 실패하였습니다.');
     req['user'] = user;
-    this.logger.assign({ user: { id: user.id, role: user.role } });
+    this.logger.assign({
+      user: { id: user.id, role: user.role, nickname: user.nickname },
+    });
     return true;
   }
 
