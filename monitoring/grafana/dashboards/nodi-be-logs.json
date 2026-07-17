@@ -38,7 +38,11 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       }
     },
@@ -61,7 +65,10 @@
         "defaults": {
           "color": { "mode": "fixed", "fixedColor": "text" },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
         },
         "overrides": []
       },
@@ -70,7 +77,11 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       }
     },
@@ -111,7 +122,11 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       }
     },
@@ -146,7 +161,12 @@
         "overrides": []
       },
       "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
         "tooltip": { "mode": "multi", "sort": "desc" }
       }
     },
@@ -177,14 +197,24 @@
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
-          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
           "color": { "mode": "palette-classic" },
           "mappings": []
         },
         "overrides": []
       },
       "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
         "tooltip": { "mode": "multi", "sort": "desc" }
       }
     },
@@ -200,7 +230,7 @@
           "datasource": { "type": "loki", "uid": "loki" },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service=~\"backend_.+\", level=\"error\"} | json | line_format \"{{if .req_method}}{{.req_method}} {{.req_url}} → {{.res_statusCode}} ({{.responseTime}}ms){{else}}{{.msg}}{{end}}\""
+          "expr": "{service=~\"backend_.+\", level=\"error\"} | json | line_format \"{{if .req_method}}{{.req_method}} {{.req_url}} → {{.res_statusCode}} ({{.responseTime}}ms){{else}}{{.msg}}{{end}}{{if .user_nickname}} [{{.user_nickname}}]{{end}}\""
         }
       ],
       "options": {
@@ -226,7 +256,7 @@
           "datasource": { "type": "loki", "uid": "loki" },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service=~\"backend_.+\"} | json | line_format \"{{if .req_method}}{{.req_method}} {{.req_url}} → {{.res_statusCode}} ({{.responseTime}}ms){{else}}{{.msg}}{{end}}\""
+          "expr": "{service=~\"backend_.+\"} | json | line_format \"{{if .req_method}}{{.req_method}} {{.req_url}} → {{.res_statusCode}} ({{.responseTime}}ms){{else}}{{.msg}}{{end}}{{if .user_nickname}} [{{.user_nickname}}]{{end}}\""
         }
       ],
       "options": {

@@ -16,6 +16,12 @@ const isProd = process.env.NODE_ENV === 'prod';
       pinoHttp: {
         level: isProd ? 'info' : 'debug',
         transport: isProd ? undefined : { target: 'pino-pretty' },
+        // 헬스체크(/health)는 Docker HEALTHCHECK 가 10초마다 호출해 로그를 뒤덮으므로 제외.
+        // ignore 가 true 면 자동 요청/응답 로그를 남기지 않음. url 은 쿼리스트링이 붙을 수
+        // 있어 '?' 앞부분만 비교.
+        autoLogging: {
+          ignore: (req) => (req.url ?? '').split('?')[0] === '/health',
+        },
         genReqId: (req: Request, res: Response) => {
           const existing = req.headers['x-request-id'];
           if (existing) return existing;

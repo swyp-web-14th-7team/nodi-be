@@ -62,20 +62,84 @@ docker compose restart alloy
 
 `http://<서버>:3000` → Grafana 로그인 → 왼쪽 **Explore** → 데이터소스 `Loki`.
 
-LogQL 예시:
+아래는 붙여넣기용 LogQL 모음입니다. 그대로 복사해 Explore 쿼리창에 넣으면 됩니다.
+
+### 기본 선택
 
 ```logql
-{service="backend_blue"}                      # 특정 색의 전체 로그
-{service=~"backend_.+"}                       # blue/green 상관없이 백엔드 전체
-{service=~"backend_.+", level="error"}        # 에러만
-{service=~"backend_.+"} |= "5xx"              # 본문 문자열 검색
-{service="nginx"}                             # nginx 액세스/에러 로그
-{service=~"backend_.+"} | json | req_id="01J..."   # 요청 ID 로 추적
+{service=~"backend_.+"}
+```
+```logql
+{service="backend_blue"}
+```
+```logql
+{service="nginx"}
 ```
 
-마지막 예시가 중요합니다. `req.id` 는 요청마다 다른 값이라 라벨로 만들면 Loki 인덱스가
-터지므로(카디널리티), 라벨이 아니라 본문에 두고 `| json` 으로 파싱해 검색합니다.
-nginx 가 `X-Request-Id` 를 발급해 백엔드로 넘기므로 같은 요청은 같은 ID 로 묶입니다.
+`{service=~"backend_.+"}` 는 blue/green 무관하게 백엔드 전체입니다. 배포 중에는 두 색이
+잠깐 공존하므로 평소엔 이걸 쓰는 게 편합니다.
+
+### 에러만
+
+```logql
+{service=~"backend_.+", level="error"}
+```
+
+`level` 은 라벨이라 인덱스에서 바로 걸러져 가장 빠릅니다.
+
+### 본문·상태코드·경로로 필터
+
+```logql
+{service=~"backend_.+"} |= "TypeError"
+```
+```logql
+{service=~"backend_.+"} | json | res_statusCode="500"
+```
+```logql
+{service=~"backend_.+"} | json | req_url=~"/auth/.*"
+```
+
+`|=` 는 로그 본문에 그 문자열이 포함된 줄(빠름). `| json` 뒤에는 필드로 거릅니다.
+필드명은 `| json` 이 중첩을 `_` 로 평탄화한 이름입니다: `res.statusCode → res_statusCode`,
+`req.url → req_url`, `user.nickname → user_nickname`.
+
+### 요청 ID 로 한 요청 추적
+
+```logql
+{service=~"backend_.+"} | json | req_id="01J..."
+```
+
+`req.id` 는 요청마다 다른 값이라 **라벨로 만들면 Loki 인덱스가 터집니다(카디널리티)**.
+그래서 라벨이 아니라 본문에 두고 `| json` 으로 파싱해 검색합니다. nginx 가 `X-Request-Id` 를
+발급해 백엔드로 넘기므로, 같은 요청은 replica 가 달라도 같은 ID 로 묶입니다.
+
+### 한 줄 요약으로 보기 (대시보드와 동일한 표시)
+
+```logql
+{service=~"backend_.+"} | json | line_format "{{if .req_method}}{{.req_method}} {{.req_url}} → {{.res_statusCode}} ({{.responseTime}}ms){{else}}{{.msg}}{{end}}{{if .user_nickname}} [{{.user_nickname}}]{{end}}"
+```
+
+`GET /profile-cards → 200 (12ms) [홍길동]` 처럼 접힌 한 줄로 나옵니다. 줄을 클릭하면
+원본 필드가 펼쳐집니다. 이 쿼리는 대시보드의 로그 패널과 동일합니다.
+
+### 실시간 스트리밍 (Live, 웹소켓)
+
+위 쿼리들은 우측 상단 **Live** 버튼을 누르면 폴링이 아니라 웹소켓(`/loki/api/v1/tail`)으로
+실시간 스트리밍됩니다. `line_format` 도 Live 에서 그대로 적용됩니다. 모바일 로그인 실패 등을
+실시간으로 지켜볼 때 유용합니다. 단, Live 는 "지금부터 들어오는 로그"만 흘리며 과거 조회·집계는
+안 되니, 추이는 대시보드(폴링)로 봅니다.
+
+### 초당 에러율 (그래프 패널용)
+
+```logql
+sum(rate({service=~"backend_.+", level="error"}[1m]))
+```
+
+로그 개수 기반 메트릭 쿼리입니다. Explore 에서 실행하면 표가 아니라 그래프로 나옵니다.
+
+> 분위수(p95 등)처럼 `unwrap` 을 쓰는 쿼리는 `by (service)` 로 집계 그룹을 지정해야 합니다.
+> 안 그러면 로그 한 줄이 각각 별개 시계열이 돼서 분위수가 계산되지 않습니다
+> (대시보드 "응답시간" 패널 참고).
 
 ## 라벨
 
