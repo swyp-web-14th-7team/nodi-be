@@ -1,0 +1,79 @@
+// Docker 소켓으로 컨테이너를 자동 탐색해 stdout/stderr 로그를 Loki 로 보냄.
+// 앱 코드나 컨테이너 로깅 드라이버를 건드리지 않으므로, blue-green 배포로 새 컨테이너가
+// 떠도 refresh_interval 안에 자동으로 수집 대상에 포함됨.
+
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+
+  // compose 로 뜬 컨테이너만 수집.
+  // 이 필터가 없으면 호스트의 모든 컨테이너(개발자가 docker run 으로 띄운 것 포함)를
+  // 긁어와서, service 라벨이 빈 스트림과 오래된 로그 거부 에러가 쏟아짐.
+  // 값 없이 키만 주면 "라벨 존재" 필터 → 프로젝트명이 바뀌어도 계속 동작함.
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project"]
+  }
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  // compose 서비스명을 service 라벨로 (backend_blue, backend_green, nginx, redis)
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  // 컨테이너명은 "/be-nginx" 처럼 슬래시가 붙어 있어 제거.
+  // backend 는 replica 라 be-nodi-backend_blue-1 / -2 로 구분됨.
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  // 모니터링 스택 자신의 로그는 수집하지 않음.
+  // (Loki 가 자기 로그를 자기에게 저장하면 노이즈가 되고, 장애 시 증폭될 수 있음)
+  rule {
+    source_labels = ["service"]
+    regex         = "loki|alloy|grafana"
+    action        = "drop"
+  }
+}
+
+loki.source.docker "containers" {
+  host    = "unix:///var/run/docker.sock"
+  targets = discovery.relabel.containers.output
+  // 위 rule 들을 로그 엔트리 라벨에도 동일하게 적용
+  relabel_rules = discovery.relabel.containers.rules
+  forward_to    = [loki.process.backend.receiver]
+}
+
+loki.process "backend" {
+  // backend 만 pino JSON 이고 nginx/redis 는 평문이므로, JSON 파싱을 backend 로 한정.
+  // (평문에 stage.json 을 걸면 매 줄 파싱 에러가 남음)
+  stage.match {
+    selector = "{service=~\"backend_.+\"}"
+
+    // NODE_ENV=prod 일 때 pino 가 level 을 "info"/"error" 문자열로 출력하도록
+    // src/lib/logger/logger.module.ts 에서 formatters.level 을 설정해 둠.
+    stage.json {
+      expressions = { level = "level" }
+    }
+
+    // level 만 라벨로 승격. req.id 같은 고유값은 라벨로 만들면 카디널리티가 폭발하므로
+    // 로그 본문에 남겨두고 쿼리에서 `| json | req_id="..."` 로 검색.
+    stage.labels {
+      values = { level = "" }
+    }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

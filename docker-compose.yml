@@ -50,8 +50,67 @@ services:
       - ./nginx/active:/etc/nginx/active:ro
     restart: unless-stopped
 
+  # ── 로그 수집 스택 (Alloy → Loki → Grafana) ──────────────
+  # 배포와 수명주기가 다름. deploy.sh 는 항상 서비스명을 명시해 호출하므로
+  # 배포 중 이 서비스들은 건드려지지 않고 계속 로그를 수집함.
+  loki:
+    image: grafana/loki:3.5.1
+    container_name: be-loki
+    command: ["-config.file=/etc/loki/loki-config.yml"]
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+    # ★ 호스트에 노출하지 말 것: Loki 는 인증이 없어 열면 누구나 로그를 읽고 쓸 수 있음
+    expose: ["3100"]
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.10.0
+    container_name: be-alloy
+    # docker.sock 을 읽으려면 docker 그룹 권한이 필요한데, 이미지 기본 사용자(alloy)는
+    # 그룹에 없어 권한 오류가 남. 호스트 GID 는 환경마다 달라 root 로 실행.
+    user: root
+    command:
+      - run
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on: [loki]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.6.1
+    container_name: be-grafana
+    ports: ["3000:3000"]
+    # 다른 서비스와 동일하게 .env.deploy 로 환경변수를 관리.
+    # 여기서 GF_SECURITY_ADMIN_PASSWORD 를 읽음.
+    #
+    # ★ .env.deploy 에 GF_SECURITY_ADMIN_PASSWORD 가 없으면 Grafana 는 에러 없이
+    #   기본 비번(admin/admin)으로 뜬다. 공개 포트라 사실상 무방비가 되니 반드시 채울 것.
+    # ★ env_file 은 파일 전체를 주입하므로 DB/AWS/JWT 비밀도 이 컨테이너 env 에 들어간다.
+    #   Grafana 가 쓰지는 않지만, 외부에 열려 있는 유일한 서비스라는 점은 인지할 것.
+    env_file:
+      - .env.deploy
+    environment:
+      # 주의: environment 는 env_file 을 덮어씀.
+      # GF_SECURITY_ADMIN_PASSWORD 를 여기에 추가하면 .env.deploy 값이 무시된다.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on: [loki]
+    restart: unless-stopped
+
 volumes:
   redis-data:        # Redis AOF 데이터 영속 볼륨
+  loki-data:         # Loki 로그 청크/인덱스 (14일 보존)
+  alloy-data:        # Alloy 로그 읽기 위치(offset) — 재시작 시 중복/누락 방지
+  grafana-data:      # Grafana 대시보드·사용자 설정
 
 # ─────────────────────────────────────────────
 # 무중단 배포 (Blue-Green)
