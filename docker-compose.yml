@@ -50,8 +50,67 @@ services:
       - ./nginx/active:/etc/nginx/active:ro
     restart: unless-stopped
 
+  # ── 로그 수집 스택 (Alloy → Loki → Grafana) ──────────────
+  # 배포와 수명주기가 다름. deploy.sh 는 항상 서비스명을 명시해 호출하므로
+  # 배포 중 이 서비스들은 건드려지지 않고 계속 로그를 수집함.
+  loki:
+    image: grafana/loki:3.5.1
+    container_name: be-loki
+    command: ["-config.file=/etc/loki/loki-config.yml"]
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+    # ★ 호스트에 노출하지 말 것: Loki 는 인증이 없어 열면 누구나 로그를 읽고 쓸 수 있음
+    expose: ["3100"]
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.10.0
+    container_name: be-alloy
+    # docker.sock 을 읽으려면 docker 그룹 권한이 필요한데, 이미지 기본 사용자(alloy)는
+    # 그룹에 없어 권한 오류가 남. 호스트 GID 는 환경마다 달라 root 로 실행.
+    user: root
+    command:
+      - run
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on: [loki]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.6.1
+    container_name: be-grafana
+    ports: ["3000:3000"]
+    # 다른 서비스와 동일하게 .env.deploy 로 환경변수를 관리.
+    # 여기서 GF_SECURITY_ADMIN_PASSWORD 를 읽음.
+    #
+    # ★ .env.deploy 에 GF_SECURITY_ADMIN_PASSWORD 가 없으면 Grafana 는 에러 없이
+    #   기본 비번(admin/admin)으로 뜬다. 공개 포트라 사실상 무방비가 되니 반드시 채울 것.
+    # ★ env_file 은 파일 전체를 주입하므로 DB/AWS/JWT 비밀도 이 컨테이너 env 에 들어간다.
+    #   Grafana 가 쓰지는 않지만, 외부에 열려 있는 유일한 서비스라는 점은 인지할 것.
+    env_file:
+      - .env.deploy
+    environment:
+      # 주의: environment 는 env_file 을 덮어씀.
+      # GF_SECURITY_ADMIN_PASSWORD 를 여기에 추가하면 .env.deploy 값이 무시된다.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on: [loki]
+    restart: unless-stopped
+
 volumes:
   redis-data:        # Redis AOF 데이터 영속 볼륨
+  loki-data:         # Loki 로그 청크/인덱스 (14일 보존)
+  alloy-data:        # Alloy 로그 읽기 위치(offset) — 재시작 시 중복/누락 방지
+  grafana-data:      # Grafana 대시보드·사용자 설정
 
 # ─────────────────────────────────────────────
 # 무중단 배포 (Blue-Green)
@@ -60,16 +119,18 @@ volumes:
 #   - 색 표기: blue ↔ green 핑퐁. 아래 명령에서 색 이름만 바꿔서 사용.
 #   - ★ profile 주의: green 은 항상 '--profile green' 필요, blue 는 불필요.
 #
-# [최초 1회] blue + nginx 기동
-#   docker compose up -d --build
+# [최초 1회] blue + nginx + 로그 수집 스택(loki/alloy/grafana) 기동
+#   docker compose up -d
 #
 # [배포]  새 코드를 "다음색"으로 올림 (예: 현재 green 활성 → blue 로 배포)
 # 1. 현재 활성 색 확인
 #   cat nginx/active/upstream.conf            # set $upstream backend_green:3000; → green 활성
-# 2. 다음색을 새 코드로 빌드·재생성  (★ start 아님! 항상 up --build)
-#   docker compose up -d --build backend_blue
-#   - stop 돼 있던(옛 코드) 다음색을 새 이미지로 갈아끼움. green 차례면:
-#       docker compose --profile green up -d --build backend_green
+# 2. 다음색을 새 이미지로 재생성  (★ start 아님! 새 이미지는 pull 로만 들어옴)
+#   docker compose pull backend_blue          # ★ 이걸 빼면 캐시된 옛 이미지가 그대로 뜸
+#   docker compose up -d backend_blue
+#   - stop 돼 있던(옛 이미지) 다음색을 새 이미지로 갈아끼움. green 차례면:
+#       docker compose --profile green pull backend_green
+#       docker compose --profile green up -d backend_green
 # 3. ★ 다음색 헬스체크 (전환 전 필수! replica 전체 healthy 확인)
 #   docker compose ps                         # backend_blue 모두 (healthy) 될 때까지 대기
 #   - healthy 안 되면 전환하지 말고 다음색 제거 후 배포 취소:
@@ -83,7 +144,7 @@ volumes:
 #   ※ 완료. 코드 문제는 배포 후 모니터링으로 발견 → 아래 롤백 사용
 #
 # [롤백]  배포 후 문제 발견 시, 직전 stop 된 색으로 복귀 (예: blue 활성 → green 복귀)
-# 1. 이전색 재가동  (★ up --build 아님! 옛 코드 그대로 start)
+# 1. 이전색 재가동  (★ pull/up -d 아님! 옛 이미지로 만들어진 컨테이너를 그대로 start)
 #   docker compose --profile green start backend_green
 # 2. ★ 이전색 헬스체크 (재가동된 색이 healthy 될 때까지 대기)
 #   docker compose --profile green ps         # backend_green (healthy) 확인
@@ -94,6 +155,6 @@ volumes:
 # 5. 문제 색(현재 활성이던 색) 정지
 #   docker compose stop backend_blue
 #
-# ※ 핵심 구분: 배포=up --build(새 코드) / 롤백=start(옛 코드 그대로)
-# ※ stop 된 이전색은 다음 배포 때 up --build 로 덮어써짐 = 직전 1버전만 롤백 가능
+# ※ 핵심 구분: 배포=pull + up -d(새 이미지) / 롤백=start(옛 이미지 그대로)
+# ※ stop 된 이전색은 다음 배포 때 up -d 로 덮어써짐 = 직전 1버전만 롤백 가능
 # ─────────────────────────────────────────────

@@ -43,6 +43,12 @@ const isProd = process.env.NODE_ENV === 'prod';
         },
         ...(isProd && {
           redact: ['req.headers.authorization', 'req.headers.cookie'],
+          // pino 기본 출력은 level 이 숫자(30=info, 50=error). Loki 에서 level="error" 로
+          // 필터하고 Grafana 가 레벨을 인식하도록 문자열로 출력.
+          // dev 는 pino-pretty 가 숫자 레벨을 알아서 색칠해 주므로 그대로 둠.
+          formatters: {
+            level: (label: string) => ({ level: label }),
+          },
         }),
       },
     }),

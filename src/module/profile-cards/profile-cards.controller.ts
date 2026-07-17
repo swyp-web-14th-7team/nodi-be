@@ -72,8 +72,10 @@ export class ProfileCardsController {
    *
    * @remarks
    * 카드의 QR 공유 토큰을 조회합니다. 소유자만 조회할 수 있습니다.
-   * 프론트에서 이 토큰으로 `{웹 주소}/public/profile-cards/share/{shareToken}`
-   * 형태의 URL 을 만들어 QR 로 인코딩하면 됩니다.
+   *
+   * 프론트에서 이 토큰으로 `{웹 share 경로}?shareToken={shareToken}` 형태의 URL 을 만들어
+   * QR 로 인코딩합니다. QR 을 스캔해 그 페이지가 열리면, 페이지는 쿼리로 받은 shareToken 으로
+   * `GET /public/profile-cards/share/{shareToken}` 을 호출해 카드를 렌더링합니다.
    * @param user
    * @param id
    */
