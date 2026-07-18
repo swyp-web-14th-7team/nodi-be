@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FormattedDate } from '@/common/type/formatted-date.type';
 import { ProfileCardInterestResponse } from '@/module/profile-cards/type/profile-card-interest-response.type';
 import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
-import { Experience, UserProfileCard } from '@/prisma/client';
+import { Experience } from '@/prisma/client';
 import { PROFILE_CARD_LINK_TYPE_DESCRIPTION } from '@/module/profile-cards/type/profile-card-link-type.enum';
 
 export class PersonalityResponse {
@@ -126,14 +126,16 @@ export class ProfileCardResponse {
   @ApiProperty({
     type: [ProfileExperienceResponse],
     description:
-      '관련 경험, 목록조회 시에는 대표 경험 (sortOrder == 1) 만 포함, 그렇지 않은 경우 모두 포함',
+      '관련 경험. **목록 조회**(GET /profile-cards, GET /public/profile-cards)에서는 ' +
+      '대표 경험(sortOrder 가장 앞) 1개만 포함되고, **단건 조회·생성·수정**에서는 ' +
+      'sortOrder 오름차순 전체가 포함됩니다.',
   })
   experiences: ProfileExperienceResponse[];
 
-  static fromProfileCard(
-    item: DisplayProfileCard | UserProfileCard,
-  ): ProfileCardResponse {
-    const response: ProfileCardResponse = {
+  // 모든 호출부가 관계를 include 한 DisplayProfileCard 를 넘긴다.
+  // (get/getAll/update/create 통일. getAll 은 experiences 를 대표 1개만 포함)
+  static fromProfileCard(item: DisplayProfileCard): ProfileCardResponse {
+    return {
       id: item.id,
       nickname: item.nickname,
       cardImageUrl: item.cardImageUrl,
@@ -143,40 +145,33 @@ export class ProfileCardResponse {
       isActive: item.isActive,
       isDefault: item.isDefault ?? false,
       userId: item.userId,
-      experiences: [],
       createdAt: FormattedDate.fromDate(item.createdAt),
       updatedAt: FormattedDate.fromDate(item.updatedAt),
-    };
-
-    // include 로 관계가 로드된 경우(ProfileCard)에만 관계 필드 매핑
-    if ('profileCardSkills' in item) {
-      response.skills = item.profileCardSkills.map((pcs) => pcs.skill.name);
-      response.interests = item.profileCardInterests.map((pci) =>
+      skills: item.profileCardSkills.map((pcs) => pcs.skill.name),
+      interests: item.profileCardInterests.map((pci) =>
         ProfileCardInterestResponse.fromInterest(pci.interest),
-      );
-      response.personality = item.personality
+      ),
+      personality: item.personality
         ? {
             id: item.personality.id,
             name: item.personality.name,
             imageUrl: item.personality.imageUrl,
           }
-        : null;
-      response.affiliationStatus = item.affiliationStatus
+        : null,
+      affiliationStatus: item.affiliationStatus
         ? { id: item.affiliationStatus.id, name: item.affiliationStatus.name }
-        : null;
-      response.purpose = item.purpose
+        : null,
+      purpose: item.purpose
         ? { id: item.purpose.id, name: item.purpose.name }
-        : null;
-      response.jobTypeName = item.jobType.name;
-      response.links = item.profileCardLinks.map((link) => ({
+        : null,
+      jobTypeName: item.jobType.name,
+      links: item.profileCardLinks.map((link) => ({
         type: link.type,
         value: link.value,
-      }));
-      response.experiences = item.experiences.map((experience: Experience) =>
+      })),
+      experiences: item.experiences.map((experience: Experience) =>
         ProfileExperienceResponse.fromExperience(experience),
-      );
-    }
-
-    return response;
+      ),
+    };
   }
 }

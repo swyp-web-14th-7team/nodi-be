@@ -82,6 +82,8 @@ export class UpdateProfileCardDto {
   links?: ProfileCardLinkInputDto[];
 
   @ApiPropertyOptional({
+    description:
+      '관련 경험 목록 (전체 교체: 넘긴 목록으로 덮어씀). sortOrder 는 표시 순서이며 1이 대표 경험, 목록 내 중복 불가',
     type: [ProfileCardExperienceInputDto],
   })
   @Type(() => ProfileCardExperienceInputDto)

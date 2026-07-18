@@ -98,7 +98,7 @@ export class ProfileCardsService {
   async createProfileCard(
     user: User,
     dto: CreateProfileCardDto,
-  ): Promise<UserProfileCard> {
+  ): Promise<DisplayProfileCard> {
     const defaultCard =
       await this.profileCardsRepository.findDefaultProfileCard(user.id);
 
@@ -112,7 +112,7 @@ export class ProfileCardsService {
     user: User,
     id: string,
     dto: UpdateProfileCardDto,
-  ): Promise<UserProfileCard> {
+  ): Promise<DisplayProfileCard> {
     const target: UserProfileCard | null =
       await this.profileCardsRepository.findUniqueProfileCard({ id });
     if (!target || target.userId !== user.id)

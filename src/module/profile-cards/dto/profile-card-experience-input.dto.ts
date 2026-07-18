@@ -12,19 +12,19 @@ import {
 } from 'class-validator';
 
 export class ProfileCardExperienceInputDto {
-  @ApiProperty()
+  @ApiProperty({ description: '경험 제목', maxLength: 500 })
   @Length(2, 500)
   @IsNotEmpty()
   @IsString()
   title: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: '경험 설명', maxLength: 2000 })
   @Length(2, 2000)
   @IsNotEmpty()
   @IsString()
   description: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: '관련 url', maxLength: 500 })
   @MaxLength(500)
   @IsUrl()
   @IsNotEmpty()

@@ -41,6 +41,8 @@ export class FindPublicProfileCardDto extends PaginationDto {
   keywords?: string;
 
   @ApiPropertyOptional({
+    description:
+      '정렬 기준. createdAt = 최신순, nickname = 닉네임 가나다순 (기본값 createdAt)',
     enum: PUBLIC_PROFILE_CARD_SORT_FIELDS,
     default: 'createdAt',
   })
