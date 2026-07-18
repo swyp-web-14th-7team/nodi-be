@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { ProfileCardLinkInputDto } from '@/module/profile-cards/dto/profile-card-link-input.dto';
 import { PROFILE_CARD_LINK_TYPE_DESCRIPTION } from '@/module/profile-cards/type/profile-card-link-type.enum';
+import { ProfileCardExperienceInputDto } from '@/module/profile-cards/dto/profile-card-experience-input.dto';
 
 export class UpdateProfileCardDto {
   @ApiPropertyOptional({ description: '스킬 ID 목록', type: [Number] })
@@ -79,4 +80,14 @@ export class UpdateProfileCardDto {
   @ValidateNested({ each: true })
   @Type(() => ProfileCardLinkInputDto)
   links?: ProfileCardLinkInputDto[];
+
+  @ApiPropertyOptional({
+    type: [ProfileCardExperienceInputDto],
+  })
+  @Type(() => ProfileCardExperienceInputDto)
+  @ValidateNested({ each: true })
+  @ArrayUnique((e: ProfileCardExperienceInputDto) => e.sortOrder)
+  @IsArray()
+  @IsOptional()
+  experiences: ProfileCardExperienceInputDto[];
 }

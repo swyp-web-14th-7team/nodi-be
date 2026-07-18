@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FormattedDate } from '@/common/type/formatted-date.type';
 import { ProfileCardInterestResponse } from '@/module/profile-cards/type/profile-card-interest-response.type';
 import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
-import { UserProfileCard } from '@/prisma/client';
+import { Experience, UserProfileCard } from '@/prisma/client';
 import { PROFILE_CARD_LINK_TYPE_DESCRIPTION } from '@/module/profile-cards/type/profile-card-link-type.enum';
 
 export class PersonalityResponse {
@@ -40,6 +40,29 @@ export class ProfileCardLinkResponse {
 
   @ApiProperty({ description: '링크(URL) 또는 이메일 값' })
   value: string;
+}
+
+export class ProfileExperienceResponse {
+  @ApiProperty({ description: '경험 제목', maxLength: 500 })
+  title: string;
+
+  @ApiProperty({ description: '경험 설명', maxLength: 2000 })
+  description: string;
+
+  @ApiProperty({ description: '관련 url', nullable: true, maxLength: 500 })
+  relatedUrl: string | null;
+
+  @ApiProperty({ description: '경험 순서 (1이면 대표경험)', minimum: 1 })
+  sortOrder: number;
+
+  static fromExperience(item: Experience): ProfileExperienceResponse {
+    return {
+      title: item.title,
+      description: item.description,
+      relatedUrl: item.relatedUrl,
+      sortOrder: item.sortOrder,
+    };
+  }
 }
 
 export class ProfileCardResponse {
@@ -100,6 +123,13 @@ export class ProfileCardResponse {
   })
   links?: ProfileCardLinkResponse[];
 
+  @ApiProperty({
+    type: [ProfileExperienceResponse],
+    description:
+      '관련 경험, 목록조회 시에는 대표 경험 (sortOrder == 1) 만 포함, 그렇지 않은 경우 모두 포함',
+  })
+  experiences: ProfileExperienceResponse[];
+
   static fromProfileCard(
     item: DisplayProfileCard | UserProfileCard,
   ): ProfileCardResponse {
@@ -113,6 +143,7 @@ export class ProfileCardResponse {
       isActive: item.isActive,
       isDefault: item.isDefault ?? false,
       userId: item.userId,
+      experiences: [],
       createdAt: FormattedDate.fromDate(item.createdAt),
       updatedAt: FormattedDate.fromDate(item.updatedAt),
     };
@@ -141,6 +172,9 @@ export class ProfileCardResponse {
         type: link.type,
         value: link.value,
       }));
+      response.experiences = item.experiences.map((experience: Experience) =>
+        ProfileExperienceResponse.fromExperience(experience),
+      );
     }
 
     return response;

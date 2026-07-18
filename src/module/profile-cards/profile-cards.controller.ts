@@ -162,11 +162,8 @@ export class ProfileCardsController {
     @Param('id') id: string,
     @Body() dto: UpdateProfileCardDto,
   ) {
-    const data = await this.profileCardsService.updateProfileCard(
-      user,
-      id,
-      dto,
-    );
+    const data: UserProfileCard =
+      await this.profileCardsService.updateProfileCard(user, id, dto);
     return ProfileCardResponse.fromProfileCard(data);
   }
 }

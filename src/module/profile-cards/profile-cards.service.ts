@@ -121,14 +121,17 @@ export class ProfileCardsService {
     try {
       return await this.profileCardsRepository.updateProfileCard(id, dto);
     } catch (e) {
-      // 존재하지 않는 skill/interest/personality ID → FK 위반(P2003)
-      if (
-        e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === 'P2003'
-      )
-        throw new BadRequestException(
-          '존재하지 않는 스킬/관심사/개성/소속상태 ID 가 포함되어 있습니다.',
-        );
+      if (e instanceof Prisma.PrismaClientKnownRequestError) {
+        // 존재하지 않는 skill/interest/personality ID → FK 위반(P2003)
+        if (e.code === 'P2003')
+          throw new BadRequestException(
+            '존재하지 않는 스킬/관심사/개성/소속상태 ID 가 포함되어 있습니다.',
+          );
+        // 유니크 제약 위반(P2002). 경험 sortOrder 중복은 DTO @ArrayUnique 로 먼저 걸리지만,
+        // 그 외 유니크 충돌을 500 대신 400 으로 방어.
+        if (e.code === 'P2002')
+          throw new BadRequestException('중복된 값이 포함되어 있습니다.');
+      }
       throw e;
     }
   }
