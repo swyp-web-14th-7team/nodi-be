@@ -117,6 +117,7 @@ model UserProfileCard {
   profileCardInterests ProfileCardInterest[]
   userCollections      UserCollection[]
   profileCardLinks     ProfileCardLink[]
+  experiences          Experience[]
 
   @@unique([userId, isDefault])
   @@map("user_profile_cards")
@@ -166,12 +167,6 @@ model Skill {
   @@map("skills")
 }
 
-/**
- * 스킬 ↔ 직군 매핑 (한 스킬이 여러 직군에 속할 수 있음)
- * 카탈로그성 마스터 데이터라 행 수 상한이 스킬 수 × 직군 수로 고정된다 (현재 시드 기준 134행).
- * 전 직군 공통 스킬은 "행 없음"으로 두지 않고 직군 수만큼 행을 모두 넣는다 —
- * 행이 없는 상태는 "아직 매핑하지 않음"과 구분되지 않기 때문.
- */
 model SkillJobType {
   skillId Int   @map("skill_id") @db.UnsignedInt
   skill   Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
@@ -228,6 +223,21 @@ model Purpose {
   profileCards UserProfileCard[]
 
   @@map("purposes")
+}
+
+// 프로필 카드 경험
+model Experience {
+  id          Int     @id @default(autoincrement()) @db.UnsignedInt
+  title       String  @db.VarChar(500)
+  description String  @db.VarChar(2000)
+  relatedUrl  String? @map("related_url") @db.VarChar(500) // 관련 링크가 없을수도?
+  sortOrder   Int     @map("sort_order") // 프론트에서 순서 (순서는 고정, 프론트에서 준 값 그대로 사용
+
+  cardId String          @map("card_id") @db.Char(26)
+  card   UserProfileCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, sortOrder])
+  @@map("experiences")
 }
 
 // 프로필 카드 링크

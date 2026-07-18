@@ -215,6 +215,7 @@ export class ProfileCardsRepository {
       cardImageUrl,
       profileImageUrl,
       links,
+      experiences,
     }: UpdateProfileCardDto,
   ): Promise<UserProfileCard> {
     return this.prismaService.userProfileCard.update({
@@ -251,6 +252,21 @@ export class ProfileCardsRepository {
           profileCardLinks: {
             deleteMany: {},
             create: links.map(({ type, value }) => ({ type, value })),
+          },
+        }),
+        // 경험은 식별자(id)가 없고 순서·내용이 자유롭게 바뀌므로 전체 교체 (links 와 동일)
+        // nested write 는 delete 를 create 보다 먼저 실행하므로 (cardId, sortOrder) 유니크 충돌 없음
+        ...(experiences !== undefined && {
+          experiences: {
+            deleteMany: {},
+            create: experiences.map(
+              ({ title, description, relatedUrl, sortOrder }) => ({
+                title,
+                description,
+                relatedUrl,
+                sortOrder,
+              }),
+            ),
           },
         }),
       },

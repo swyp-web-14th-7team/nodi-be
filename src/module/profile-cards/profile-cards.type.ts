@@ -33,6 +33,7 @@ export const displayProfileCardIncludeOptions = {
     },
   },
   profileCardLinks: true,
+  experiences: true,
 } satisfies Prisma.UserProfileCardInclude;
 
 export type DisplayProfileCard = Prisma.UserProfileCardGetPayload<{
