@@ -20,6 +20,8 @@ export class PublicProfileCardsController {
    *
    * 토큰을 가진 것 자체가 접근 권한이므로, 목록에 노출되지 않는
    * 비공개(isActive=false) 카드도 이 경로로는 조회됩니다.
+   *
+   * ★ experiences 는 전체를 sortOrder 오름차순으로 포함합니다.
    * @param token
    */
   @Get('share/:token')
@@ -38,6 +40,8 @@ export class PublicProfileCardsController {
    *
    * @remarks
    * 인증 없이 카드 ID 로 프로필 카드를 조회합니다. (카드 공유용)
+   *
+   * ★ experiences 는 전체를 sortOrder 오름차순으로 포함합니다. (목록 조회는 대표 1개만)
    * @param id
    */
   @Get(':id')
@@ -57,6 +61,9 @@ export class PublicProfileCardsController {
    * @remarks
    * 인증 없이 활성(isActive) 프로필 카드 목록을 조회합니다.
    * purpose / jobTypeId / affiliationStatusId 필터와 keywords(닉네임) 검색을 지원합니다.
+   *
+   * ★ experiences 는 **대표 경험 1개만**(sortOrder 가장 앞) 포함됩니다.
+   *   전체 경험이 필요하면 단건 조회를 사용하세요. (사설 목록 조회와 동일한 규칙)
    * @param dto
    */
   @Get()

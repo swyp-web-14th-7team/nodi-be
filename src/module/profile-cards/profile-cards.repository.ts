@@ -10,6 +10,7 @@ import {
   type DefaultUserProfileCard,
   DisplayProfileCard,
   displayProfileCardIncludeOptions,
+  listProfileCardIncludeOptions,
 } from '@/module/profile-cards/profile-cards.type';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
@@ -47,7 +48,8 @@ export class ProfileCardsRepository {
       this.prismaService.userProfileCard.count({ where: whereOptions }),
       this.prismaService.userProfileCard.findMany({
         where: whereOptions,
-        include: displayProfileCardIncludeOptions,
+        // 목록: 대표 경험 1개만 포함
+        include: listProfileCardIncludeOptions,
         skip: skip,
         take: limit,
         orderBy: { [sort]: order },
@@ -83,7 +85,8 @@ export class ProfileCardsRepository {
       this.prismaService.userProfileCard.count({ where }),
       this.prismaService.userProfileCard.findMany({
         where,
-        include: displayProfileCardIncludeOptions,
+        // 목록: 대표 경험 1개만 포함
+        include: listProfileCardIncludeOptions,
         skip,
         take: limit,
         orderBy: { [sort]: order },
@@ -143,7 +146,7 @@ export class ProfileCardsRepository {
   async createDefaultProfileCard(
     user: User,
     dto: CreateProfileCardDto,
-  ): Promise<UserProfileCard> {
+  ): Promise<DisplayProfileCard> {
     return this.prismaService.userProfileCard.create({
       data: {
         userId: user.id,
@@ -154,6 +157,7 @@ export class ProfileCardsRepository {
         isDefault: true,
         isActive: false,
       },
+      include: displayProfileCardIncludeOptions,
     });
   }
 
@@ -165,7 +169,7 @@ export class ProfileCardsRepository {
     user: User,
     dto: CreateProfileCardDto,
     defaultCard: DefaultUserProfileCard,
-  ): Promise<UserProfileCard> {
+  ): Promise<DisplayProfileCard> {
     return this.prismaService.userProfileCard.create({
       data: {
         userId: user.id,
@@ -192,6 +196,7 @@ export class ProfileCardsRepository {
           },
         },
       },
+      include: displayProfileCardIncludeOptions,
     });
   }
 
@@ -217,9 +222,10 @@ export class ProfileCardsRepository {
       links,
       experiences,
     }: UpdateProfileCardDto,
-  ): Promise<UserProfileCard> {
+  ): Promise<DisplayProfileCard> {
     return this.prismaService.userProfileCard.update({
       where: { id },
+      include: displayProfileCardIncludeOptions,
       data: {
         description,
         affiliation,
