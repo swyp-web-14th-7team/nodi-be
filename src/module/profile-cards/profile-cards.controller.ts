@@ -15,7 +15,6 @@ import { CurrentUser } from '@/common/decorator/current-user.decorator';
 import { type User } from '@/prisma/client';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
 import { ProfileCardResponse } from '@/module/profile-cards/type/profile-card-response.type';
-import { ProfileCardShareResponse } from '@/module/profile-cards/type/profile-card-share-response.type';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
 import { ApiNotFoundResponse } from '@nestjs/swagger';
 import { PaginationDto } from '@/common/dto/pagination.dto';
@@ -84,64 +83,12 @@ export class ProfileCardsController {
   }
 
   /**
-   * QR 공유 토큰 조회
-   *
-   * @remarks
-   * 카드의 QR 공유 토큰을 조회합니다. 소유자만 조회할 수 있습니다.
-   *
-   * 프론트에서 이 토큰으로 `{웹 share 경로}?shareToken={shareToken}` 형태의 URL 을 만들어
-   * QR 로 인코딩합니다. QR 을 스캔해 그 페이지가 열리면, 페이지는 쿼리로 받은 shareToken 으로
-   * `GET /public/profile-cards/share/{shareToken}` 을 호출해 카드를 렌더링합니다.
-   * @param user
-   * @param id
-   */
-  @Get(':id/share')
-  @Auth(UserRole.ADMIN, UserRole.USER)
-  @ApiResponseSuccess(ProfileCardShareResponse)
-  @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
-  async getProfileCardShareToken(
-    @CurrentUser() user: User,
-    @Param('id') id: string,
-  ): Promise<ProfileCardShareResponse> {
-    const shareToken: string = await this.profileCardsService.findShareToken(
-      user,
-      id,
-    );
-    return ProfileCardShareResponse.fromShareToken(shareToken);
-  }
-
-  /**
-   * QR 공유 토큰 재발급
-   *
-   * @remarks
-   * 카드의 QR 공유 토큰을 새로 발급합니다. 소유자만 호출할 수 있습니다.
-   *
-   * 이미 공유한 QR 을 무효화할 때 사용합니다. 재발급 시점부터 기존 토큰으로는
-   * 조회되지 않습니다.
-   * @param user
-   * @param id
-   */
-  @Patch(':id/share')
-  @Auth(UserRole.ADMIN, UserRole.USER)
-  @ApiResponseSuccess(ProfileCardShareResponse)
-  @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
-  async updateProfileCardShareToken(
-    @CurrentUser() user: User,
-    @Param('id') id: string,
-  ): Promise<ProfileCardShareResponse> {
-    const shareToken: string = await this.profileCardsService.updateShareToken(
-      user,
-      id,
-    );
-    return ProfileCardShareResponse.fromShareToken(shareToken);
-  }
-
-  /**
    * 유저 프로필 카드 생성
    * @remarks
    * 유저 프로필 카드를 생성합니다. 동작 방식은 두 가지로 나뉩니다.
    *
    * 1. 유저의 Default 프로필 카드가 없는 경우 (온보딩)
+   *    → 이 카드가 Default 카드로 생성되며, purposeId 는 요청값과 무관하게 null 로 고정됩니다.
    * 2. 유저의 Default 프로필 카드가 있는 경우 (추후 카드 생성 시점)
    *
    * ★ 응답은 관계까지 포함한 완전한 카드(단건 조회와 동일 형태)입니다.
