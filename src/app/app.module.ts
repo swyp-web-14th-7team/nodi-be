@@ -16,6 +16,7 @@ import { JobTypeModule } from '@/module/job-type/job-type.module';
 import { PersonalitiesModule } from '@/module/personalities/personalities.module';
 import { AffiliationStatusesModule } from '@/module/affiliation-statuses/affiliation-statuses.module';
 import { PurposesModule } from '@/module/purposes/purposes.module';
+import { CollectionsModule } from '@/module/collections/collections.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { PurposesModule } from '@/module/purposes/purposes.module';
     PersonalitiesModule,
     AffiliationStatusesModule,
     PurposesModule,
+    CollectionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
