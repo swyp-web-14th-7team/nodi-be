@@ -99,4 +99,17 @@ export class ProfileCardsService {
       throw e;
     }
   }
+
+  async deleteProfileCard(user: User, id: string): Promise<void> {
+    const target: UserProfileCard | null =
+      await this.profileCardsRepository.findUniqueProfileCard({ id });
+    if (!target || target.userId !== user.id)
+      throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
+
+    // 기본 카드는 다른 카드 생성의 원본(seed)이므로 삭제할 수 없다.
+    if (target.isDefault)
+      throw new BadRequestException('기본 프로필 카드는 삭제할 수 없습니다.');
+
+    await this.profileCardsRepository.deleteProfileCard(id);
+  }
 }

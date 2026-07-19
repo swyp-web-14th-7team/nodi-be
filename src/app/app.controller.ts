@@ -3,6 +3,7 @@ import { AppService } from './app.service';
 import { PrismaService } from '@/lib/prisma/prisma.service';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { HealthCheckResponse } from '@/app/type/health-check-response.type';
+import { ApiExcludeEndpoint } from '@nestjs/swagger';
 
 @Controller()
 export class AppController {
@@ -14,6 +15,7 @@ export class AppController {
   ) {}
 
   @Get('health')
+  @ApiExcludeEndpoint()
   getHealth(@Headers('host') host: string): HealthCheckResponse {
     const uptime = process.uptime();
     return {
@@ -25,6 +27,7 @@ export class AppController {
   }
 
   @Get()
+  @ApiExcludeEndpoint()
   getHello(): string {
     return 'server is running!';
   }

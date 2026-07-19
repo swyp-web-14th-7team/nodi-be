@@ -252,7 +252,7 @@ model ProfileCardLink {
 // -------------- 스크랩 --------------
 model CollectionGroup {
   id   Int    @id @default(autoincrement()) @db.UnsignedInt
-  name String @db.VarChar(100)
+  name String @default("보관함") @db.VarChar(100)
 
   userId          String           @map("user_id") @db.Char(26)
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -267,12 +267,12 @@ model UserCollection {
   userId String @map("user_id") @db.Char(26)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  groupId Int?             @map("group_id") @db.UnsignedInt
-  group   CollectionGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId Int             @map("group_id") @db.UnsignedInt
+  group   CollectionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  cardId String?          @map("card_id") @db.Char(26)
-  card   UserProfileCard? @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  cardId String          @map("card_id") @db.Char(26)
+  card   UserProfileCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, groupId, cardId])
+  @@unique([userId, cardId])
   @@map("user_collections")
 }

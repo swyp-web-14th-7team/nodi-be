@@ -55,23 +55,29 @@ export class ProfileCardsRepository {
   }
 
   /** 공개(활성) 프로필 카드 목록 조회 (필터: purpose/jobType/affiliationStatus, 검색: 닉네임/관심사) */
-  async findManyPublicProfileCards(
-    dto: FindPublicProfileCardDto,
-  ): Promise<PaginationResult<DisplayProfileCard>> {
-    const { skip, limit, sort, order } = dto;
+  async findManyPublicProfileCards({
+    skip,
+    limit,
+    sort,
+    order,
+    purposeId,
+    affiliationStatusId,
+    jobTypeId,
+    keywords,
+  }: FindPublicProfileCardDto): Promise<PaginationResult<DisplayProfileCard>> {
     const where: Prisma.UserProfileCardWhereInput = {
       isActive: true,
       // undefined 면 필터 없음, 값이 있으면 해당 값으로 필터
-      purposeId: dto.purpose,
-      affiliationStatusId: dto.affiliationStatusId,
-      jobTypeId: dto.jobTypeId,
+      purposeId,
+      affiliationStatusId,
+      jobTypeId,
       // 닉네임 또는 관심사 이름 부분 일치 검색
-      ...(dto.keywords && {
+      ...(keywords && {
         OR: [
-          { nickname: { contains: dto.keywords } },
+          { nickname: { contains: keywords } },
           {
             profileCardInterests: {
-              some: { interest: { name: { contains: dto.keywords } } },
+              some: { interest: { name: { contains: keywords } } },
             },
           },
         ],
@@ -198,6 +204,7 @@ export class ProfileCardsRepository {
       affiliation,
       cardImageUrl,
       profileImageUrl,
+      isActive,
       links,
       experiences,
     }: UpdateProfileCardDto,
@@ -211,6 +218,7 @@ export class ProfileCardsRepository {
         affiliationStatusId,
         cardImageUrl,
         profileImageUrl,
+        isActive,
         ...(personalityId !== undefined && {
           personalityId: personalityId,
         }),
@@ -256,5 +264,10 @@ export class ProfileCardsRepository {
         }),
       },
     });
+  }
+
+  /** 프로필 카드 삭제. 연결된 경험/스킬/관심사/링크/스크랩은 스키마의 onDelete 규칙으로 함께 정리된다. */
+  async deleteProfileCard(id: string): Promise<void> {
+    await this.prismaService.userProfileCard.delete({ where: { id } });
   }
 }

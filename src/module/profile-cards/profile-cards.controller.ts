@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -16,7 +17,7 @@ import { type User } from '@/prisma/client';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
 import { ProfileCardResponse } from '@/module/profile-cards/type/profile-card-response.type';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
-import { ApiNotFoundResponse } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiNotFoundResponse } from '@nestjs/swagger';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationType } from '@/common/type/pagination.type';
 import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
@@ -138,5 +139,31 @@ export class ProfileCardsController {
     const data: DisplayProfileCard =
       await this.profileCardsService.updateProfileCard(user, id, dto);
     return ProfileCardResponse.fromProfileCard(data);
+  }
+
+  /**
+   * 유저 프로필 카드 삭제
+   *
+   * @remarks
+   * 로그인한 유저 본인이 소유한 프로필 카드를 삭제합니다.
+   * 본인 소유가 아니거나 존재하지 않으면 404 를 반환합니다.
+   *
+   * ★ 기본(Default) 카드는 다른 카드 생성의 원본(seed)이므로 삭제할 수 없으며 400 을 반환합니다.
+   *   카드에 연결된 경험/스킬/관심사/링크/스크랩은 함께 정리됩니다.
+   * @param user
+   * @param id
+   */
+  @Delete(':id')
+  @Auth(UserRole.ADMIN, UserRole.USER)
+  @ApiResponseSuccess()
+  @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
+  @ApiBadRequestResponse({
+    description: '기본 프로필 카드는 삭제할 수 없습니다.',
+  })
+  async deleteProfileCard(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.profileCardsService.deleteProfileCard(user, id);
   }
 }

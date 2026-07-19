@@ -18,7 +18,7 @@ export class FindPublicProfileCardDto extends PaginationDto {
   @IsInt()
   @Min(1)
   @IsOptional()
-  purpose?: number;
+  purposeId?: number;
 
   @ApiPropertyOptional({ description: '직군 필터' })
   @Type(() => Number)
