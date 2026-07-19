@@ -87,7 +87,7 @@ model UserProfileCard {
   createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
   isActive  Boolean  @default(true) @map("is_active")
-  isDefault Boolean? @map("is_default")
+  isDefault Boolean? @map("is_default") // default 이면 true, 아니면 null
 
   // 카드가 속한 직군 (필수)
   jobTypeId Int     @map("job_type_id") @db.UnsignedInt

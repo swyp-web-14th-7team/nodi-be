@@ -117,7 +117,11 @@ export class ProfileCardsRepository {
     });
   }
 
-  /** 첫 카드 = 기본(default) 카드 생성 */
+  /**
+   * 첫 카드 = 기본(default) 카드 생성
+   * 기본 카드는 특정 목적에 종속되지 않는 원본이므로 purposeId 는 항상 null 로 고정한다.
+   * (dto.purposeId 가 넘어와도 무시)
+   */
   async createDefaultProfileCard(
     user: User,
     dto: CreateProfileCardDto,
@@ -127,7 +131,7 @@ export class ProfileCardsRepository {
         userId: user.id,
         nickname: user.nickname,
         jobTypeId: dto.jobTypeId,
-        purposeId: dto.purposeId,
+        purposeId: null,
         isDefault: true,
         isActive: false,
       },
