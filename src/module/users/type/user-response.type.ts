@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from '@/prisma/client';
 import { FormattedDate } from '@/common/type/formatted-date.type';
+import { UserWithDefaultCard } from '@/module/users/users.type';
+import { ProfileCardResponse } from '@/module/profile-cards/type/profile-card-response.type';
 
 export class UserResponse {
   @ApiProperty({ description: '유저 ID' })
@@ -21,7 +23,10 @@ export class UserResponse {
   @ApiProperty()
   updatedAt: FormattedDate;
 
-  static fromUser(item: User): UserResponse {
+  @ApiProperty({ nullable: true })
+  defaultCard: ProfileCardResponse | null;
+
+  static fromUser(item: User | UserWithDefaultCard): UserResponse {
     return {
       id: item.id,
       name: item.name,
@@ -29,6 +34,10 @@ export class UserResponse {
       email: item.email,
       createdAt: FormattedDate.fromDate(item.createdAt),
       updatedAt: FormattedDate.fromDate(item.updatedAt),
+      defaultCard:
+        'profileCards' in item
+          ? ProfileCardResponse.fromProfileCard(item.profileCards[0])
+          : null,
     };
   }
 }

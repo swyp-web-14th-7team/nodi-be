@@ -1,4 +1,10 @@
-import { Body, Controller, Get, Patch } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Patch,
+} from '@nestjs/common';
 import { UsersService } from '@/module/users/users.service';
 import { type User } from '@/prisma/client';
 import { CurrentUser } from '@/common/decorator/current-user.decorator';
@@ -11,6 +17,7 @@ import {
 } from '@nestjs/swagger';
 import { ApiResponseSuccess } from '@/common/decorator/api-response-success.decorator';
 import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
+import { UserWithDefaultCard } from '@/module/users/users.type';
 
 @ApiInternalServerErrorResponse()
 @Controller('users')
@@ -26,8 +33,16 @@ export class UsersController {
   @Get('me')
   @Auth(UserRole.USER, UserRole.ADMIN)
   @ApiResponseSuccess(UserResponse)
-  getMe(@CurrentUser() user: User): UserResponse {
-    return UserResponse.fromUser(user);
+  async getMe(@CurrentUser() user: User): Promise<UserResponse> {
+    const data: UserWithDefaultCard | User | null =
+      await this.usersService.findUnique(
+        {
+          id: user.id,
+        },
+        true,
+      );
+    if (!data) throw new NotFoundException('유저를 찾을 수 없습니다.');
+    return UserResponse.fromUser(data);
   }
 
   /**

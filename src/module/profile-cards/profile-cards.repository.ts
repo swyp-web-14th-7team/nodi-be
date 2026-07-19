@@ -152,9 +152,12 @@ export class ProfileCardsRepository {
       data: {
         userId: user.id,
         nickname: defaultCard.nickname,
-        jobTypeId: dto.jobTypeId,
+        description: defaultCard.description,
+        jobTypeId: defaultCard.jobTypeId, // 직군은 유저 단위로 고정 → default 에서 복사 (dto.jobTypeId 무시)
         purposeId: dto.purposeId,
         personalityId: defaultCard.personalityId, // 개성은 단일 FK 복사
+        affiliationStatusId: defaultCard.affiliationStatusId, // 소속 상태 FK 복사
+        affiliation: defaultCard.affiliation, // 소속(자유 입력) 복사
         isDefault: false,
         isActive: false,
         profileCardSkills: {

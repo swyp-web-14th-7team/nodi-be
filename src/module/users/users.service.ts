@@ -1,18 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@/lib/prisma/prisma.service';
 import { type User } from '@/prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { UserRole } from '@/common/enum/user-role.enum';
 import { LoginParams } from '@/module/users/type/login-params.type';
 import { Prisma } from '@/prisma/client';
 import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
+import { UsersRepository } from '@/module/users/users.repository';
+import { UserWithDefaultCard } from '@/module/users/users.type';
 
 @Injectable()
 export class UsersService {
   private readonly ADMIN_EMAIL: string;
 
   constructor(
-    private readonly prismaService: PrismaService,
+    private readonly usersRepository: UsersRepository,
     private readonly configService: ConfigService,
   ) {
     this.ADMIN_EMAIL = configService.getOrThrow<string>('ADMIN_EMAIL');
@@ -20,55 +21,29 @@ export class UsersService {
 
   async findUnique(
     whereOptions: Prisma.UserWhereUniqueInput,
-  ): Promise<User | null> {
-    return this.prismaService.user.findUnique({
-      where: { ...whereOptions, deletedAt: null },
-    });
+    withDefault: boolean = false,
+  ): Promise<UserWithDefaultCard | User | null> {
+    return withDefault
+      ? this.usersRepository.findUniqueUserWithDefaultCard(whereOptions)
+      : this.usersRepository.findUniqueUser(whereOptions);
   }
 
-  async updateMyProfile(user: User, dto: UpdateProfileDto): Promise<User> {
-    return this.prismaService.user.update({
-      where: { id: user.id },
-      data: { ...dto },
-    });
+  async updateMyProfile(
+    user: User,
+    dto: UpdateProfileDto,
+  ): Promise<UserWithDefaultCard> {
+    return this.usersRepository.updateUser(user.id, dto);
   }
 
-  private async findUniqueByAuth(
-    whereOptions: Prisma.UserAuthWhereUniqueInput,
-  ): Promise<User | null> {
-    const data: { user: User } | null =
-      await this.prismaService.userAuth.findUnique({
-        where: { ...whereOptions, user: { deletedAt: null } },
-        select: { user: true },
-      });
-    return data?.user ?? null;
-  }
-
-  private async signUp({
-    name,
-    providerId,
-    email,
-    provider,
-  }: LoginParams): Promise<User> {
-    return this.prismaService.user.create({
-      data: {
-        name,
-        email,
-        nickname: name,
-        ...(this.ADMIN_EMAIL === email && { role: UserRole.ADMIN }),
-        auths: { create: { providerId, provider } },
-      },
-    });
+  private async signUp(params: LoginParams): Promise<User> {
+    // 관리자 이메일과 일치하면 ADMIN 권한 부여
+    const role: UserRole | undefined =
+      this.ADMIN_EMAIL === params.email ? UserRole.ADMIN : undefined;
+    return this.usersRepository.createUser({ ...params, role });
   }
 
   /**
    * 유저가 존재하지 않는다면 추가하여 반환, 동일한 유저 (email) 가 인증을 추가할 경우 인증 추가
-   *
-   * @param param0
-   * @param param0.name
-   * @param param0.providerId
-   * @param param0.provider
-   * @param param0.email
    */
   async login({
     name,
@@ -76,16 +51,20 @@ export class UsersService {
     provider,
     email,
   }: LoginParams): Promise<User> {
-    const byAuth: User | null = await this.findUniqueByAuth({
-      provider_providerId: { provider, providerId },
-    });
+    const byAuth: User | null = await this.usersRepository.findUniqueUserByAuth(
+      {
+        provider_providerId: { provider, providerId },
+      },
+    );
     if (byAuth) return byAuth;
 
     const byEmail: User | null = await this.findUnique({ email });
     if (byEmail) {
       // 같은 이메일 유저가 있으면 신규 가입 대신 새 provider 인증만 연결
-      await this.prismaService.userAuth.create({
-        data: { userId: byEmail.id, provider, providerId },
+      await this.usersRepository.createUserAuth({
+        userId: byEmail.id,
+        provider,
+        providerId,
       });
       return byEmail;
     }
