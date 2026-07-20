@@ -17,6 +17,7 @@ import { PersonalitiesModule } from '@/module/personalities/personalities.module
 import { AffiliationStatusesModule } from '@/module/affiliation-statuses/affiliation-statuses.module';
 import { PurposesModule } from '@/module/purposes/purposes.module';
 import { CollectionsModule } from '@/module/collections/collections.module';
+import { ConnectionsModule } from '@/module/connections/connections.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { CollectionsModule } from '@/module/collections/collections.module';
     AffiliationStatusesModule,
     PurposesModule,
     CollectionsModule,
+    ConnectionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
