@@ -6,7 +6,12 @@ import { LoginParams } from '@/module/users/type/login-params.type';
 import { Prisma } from '@/prisma/client';
 import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
 import { UsersRepository } from '@/module/users/users.repository';
-import { UserWithDefaultCard } from '@/module/users/users.type';
+import {
+  UserWithDefaultCard,
+  UserWithLastLogin,
+} from '@/module/users/users.type';
+import { PaginationDto } from '@/common/dto/pagination.dto';
+import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
 export class UsersService {
@@ -33,6 +38,18 @@ export class UsersService {
     dto: UpdateProfileDto,
   ): Promise<UserWithDefaultCard> {
     return this.usersRepository.updateUser(user.id, dto);
+  }
+
+  /** 전체 유저 목록 조회 (관리자용) */
+  async findAllUsers(
+    pagination: PaginationDto,
+  ): Promise<PaginationResult<UserWithLastLogin>> {
+    return this.usersRepository.findManyUsers(pagination);
+  }
+
+  /** 회원 탈퇴 (소프트 딜리트 + 세션 종료) */
+  async withdraw(user: User): Promise<void> {
+    await this.usersRepository.softDeleteUser(user);
   }
 
   private async signUp(params: LoginParams): Promise<User> {
