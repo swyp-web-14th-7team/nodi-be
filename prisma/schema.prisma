@@ -114,6 +114,9 @@ model UserProfileCard {
   profileCardLinks     ProfileCardLink[]
   experiences          Experience[]
 
+  sentConnectionRequests     CardConnectionRequest[] @relation("SentConnectionRequests")
+  receivedConnectionRequests CardConnectionRequest[] @relation("ReceivedConnectionRequests")
+
   @@unique([userId, isDefault])
   @@map("user_profile_cards")
 }
@@ -275,4 +278,61 @@ model UserCollection {
 
   @@unique([userId, cardId])
   @@map("user_collections")
+}
+
+// -------------- 연결 요청, 보관함 --------------
+
+// 카드 → 카드 연결 요청 (요청 생명주기 관리)
+model CardConnectionRequest {
+  id String @id @default(ulid()) @db.Char(26)
+
+  // 0: PENDING, 1: ACCEPTED, 2: REJECTED, 3: CANCELED (요청자 취소)
+  status  Int     @default(0) @db.TinyInt
+  message String? @db.VarChar(500) // 연결 요청 첨부 메시지 (선택)
+
+  // 요청을 보낸 카드 (aCard1)
+  requesterCardId String          @map("requester_card_id") @db.Char(26)
+  requesterCard   UserProfileCard @relation("SentConnectionRequests", fields: [requesterCardId], references: [id], onDelete: Cascade)
+
+  // 요청을 받은 카드 (bCard2)
+  receiverCardId String          @map("receiver_card_id") @db.Char(26)
+  receiverCard   UserProfileCard @relation("ReceivedConnectionRequests", fields: [receiverCardId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  respondedAt DateTime? @map("responded_at") @db.DateTime(3) // 수락/거절 시점
+
+  @@unique([requesterCardId, receiverCardId]) // 같은 카드쌍 중복 요청 방지 (재요청은 이 row를 PENDING으로 복구)
+  @@index([receiverCardId, status]) // "이 카드가 받은 요청함" 조회
+  @@map("card_connection_requests")
+}
+
+// 성립된 연결 = 보관 (수락 시에만 생성, 성립 시점 스냅샷 보유, request와 완전히 독립)
+model CardConnection {
+  id String @id @default(ulid()) @db.Char(26)
+
+  // 소유자 식별 (보관함 조회용)
+  requesterUserId String @map("requester_user_id") @db.Char(26)
+  receiverUserId  String @map("receiver_user_id") @db.Char(26)
+
+  // 연결된 카드 식별자 (FK 아님, 순수 식별자 — 카드 삭제와 무관하게 중복 방지용으로 보존)
+  requesterCardId String @map("requester_card_id") @db.Char(26)
+  receiverCardId  String @map("receiver_card_id") @db.Char(26)
+
+  // 성립 시점 불변 스냅샷 (카드의 모든 연관 데이터를 include 한 결과를 통째로 저장, 이후 수정/삭제와 무관)
+  requesterCardSnapshot Json @map("requester_card_snapshot")
+  receiverCardSnapshot  Json @map("receiver_card_snapshot")
+
+  // 요청 시 첨부 메시지 (성립 시점에 request로부터 복사, 이후 독립)
+  message String? @db.VarChar(255)
+
+  // 각자 관점의 "내 보관함에서 제거" 소프트 삭제
+  requesterRemovedAt DateTime? @map("requester_removed_at") @db.DateTime(3)
+  receiverRemovedAt  DateTime? @map("receiver_removed_at") @db.DateTime(3)
+
+  connectedAt DateTime @default(now()) @map("connected_at") @db.DateTime(3)
+
+  @@unique([requesterCardId, receiverCardId]) // 카드쌍당 연결 1건 (수락 멱등성)
+  @@index([requesterUserId])
+  @@index([receiverUserId])
+  @@map("card_connections")
 }
