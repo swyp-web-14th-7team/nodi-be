@@ -162,7 +162,7 @@ export class ProfileCardsRepository {
         nickname: defaultCard.nickname,
         jobTypeId,
         purposeId,
-        isDefault: false,
+        isDefault: null,
         isActive: false,
         profileCardLinks: {
           createMany: {
