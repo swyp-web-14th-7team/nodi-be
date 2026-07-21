@@ -147,36 +147,28 @@ export class ProfileCardsRepository {
 
   /**
    * 기본 카드를 seed 로 새 카드 생성
-   * skills / interests / personalities 를 nested createMany 로 함께 복사 (원자적)
+   * - defaultCard 에서는 nickname 과 links 만 기본값으로 복사 (links 는 상황과 무관하게 유지되는 값)
+   * - jobTypeId / purposeId 는 dto 값으로 설정
+   * - 나머지 필드(description / personality / affiliation / skills / interests 등)는 비워두고 이후 update 로 채움
    */
   async createProfileCard(
     user: User,
-    dto: CreateProfileCardDto,
+    { jobTypeId, purposeId }: CreateProfileCardDto,
     defaultCard: DefaultUserProfileCard,
   ): Promise<DisplayProfileCard> {
     return this.prismaService.userProfileCard.create({
       data: {
         userId: user.id,
         nickname: defaultCard.nickname,
-        description: defaultCard.description,
-        jobTypeId: defaultCard.jobTypeId, // 직군은 유저 단위로 고정 → default 에서 복사 (dto.jobTypeId 무시)
-        purposeId: dto.purposeId,
-        personalityId: defaultCard.personalityId, // 개성은 단일 FK 복사
-        affiliationStatusId: defaultCard.affiliationStatusId, // 소속 상태 FK 복사
-        affiliation: defaultCard.affiliation, // 소속(자유 입력) 복사
+        jobTypeId,
+        purposeId,
         isDefault: false,
         isActive: false,
-        profileCardSkills: {
+        profileCardLinks: {
           createMany: {
-            data: defaultCard.profileCardSkills.map(({ skillId }) => ({
-              skillId,
-            })),
-          },
-        },
-        profileCardInterests: {
-          createMany: {
-            data: defaultCard.profileCardInterests.map(({ interestId }) => ({
-              interestId,
+            data: defaultCard.profileCardLinks.map((link) => ({
+              type: link.type,
+              value: link.value,
             })),
           },
         },
