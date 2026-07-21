@@ -91,7 +91,8 @@ export class ProfileCardsController {
    * 1. 유저의 Default 프로필 카드가 없는 경우 (온보딩)
    *    → 이 카드가 Default 카드로 생성되며, purposeId 는 요청값과 무관하게 null 로 고정됩니다.
    * 2. 유저의 Default 프로필 카드가 있는 경우 (추후 카드 생성 시점)
-   *    → 직군(jobTypeId)은 유저 단위로 고정이라 요청값은 무시되고 Default 카드에서 복사됩니다.
+   *    → jobTypeId / purposeId 는 요청값으로 설정되고, Default 카드에서는 nickname 과 links 만 기본값으로 복사됩니다.
+   *    → 나머지 필드는 비워둔 채 생성되며 이후 update 로 채웁니다.
    *
    * ★ 응답은 관계까지 포함한 완전한 카드(단건 조회와 동일 형태)입니다.
    *   experiences 는 전체 포함이며, 첫 카드(온보딩)는 아직 비어 있어 `[]` 로 나옵니다.
