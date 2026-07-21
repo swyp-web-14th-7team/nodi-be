@@ -35,7 +35,7 @@ export class UserResponse {
       createdAt: FormattedDate.fromDate(item.createdAt),
       updatedAt: FormattedDate.fromDate(item.updatedAt),
       defaultCard:
-        'profileCards' in item
+        'profileCards' in item && item.profileCards[0]
           ? ProfileCardResponse.fromProfileCard(item.profileCards[0])
           : null,
     };
