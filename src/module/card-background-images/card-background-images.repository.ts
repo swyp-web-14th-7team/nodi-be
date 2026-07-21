@@ -28,4 +28,12 @@ export class CardBackgroundImagesRepository {
   ): Promise<CardBackgroundImage> {
     return this.prismaService.cardBackgroundImage.create({ data: params });
   }
+
+  async findUnique(id: number): Promise<CardBackgroundImage | null> {
+    return this.prismaService.cardBackgroundImage.findUnique({ where: { id } });
+  }
+
+  async delete(id: number): Promise<CardBackgroundImage> {
+    return this.prismaService.cardBackgroundImage.delete({ where: { id } });
+  }
 }

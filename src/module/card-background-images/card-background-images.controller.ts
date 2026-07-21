@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiNotFoundResponse } from '@nestjs/swagger';
 import { CardBackgroundImagesService } from '@/module/card-background-images/card-background-images.service';
 import { CardBackgroundImage } from '@/prisma/client';
 import { ApiResponseSuccess } from '@/common/decorator/api-response-success.decorator';
@@ -57,6 +67,25 @@ export class CardBackgroundImagesController {
   ): Promise<CardBackgroundImageResponse> {
     const data: CardBackgroundImage =
       await this.cardBackgroundImagesService.create(dto);
+    return CardBackgroundImageResponse.fromCardBackgroundImage(data);
+  }
+
+  /**
+   * 카드 배경 이미지 삭제 (ADMIN)
+   * @remarks
+   * 등록된 카드 배경 선택지를 삭제합니다. 존재하지 않으면 404 를 반환합니다.
+   * (S3 원본 이미지 및 이미 이 URL 을 사용 중인 카드는 영향받지 않습니다.)
+   * @param id
+   */
+  @Delete(':id')
+  @Auth(UserRole.ADMIN)
+  @ApiResponseSuccess(CardBackgroundImageResponse)
+  @ApiNotFoundResponse({ description: '카드 배경 이미지를 찾을 수 없습니다.' })
+  async delete(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<CardBackgroundImageResponse> {
+    const data: CardBackgroundImage =
+      await this.cardBackgroundImagesService.delete(id);
     return CardBackgroundImageResponse.fromCardBackgroundImage(data);
   }
 }
