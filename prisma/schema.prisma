@@ -223,6 +223,16 @@ model Purpose {
   @@map("purposes")
 }
 
+// 카드 배경 이미지 선택지 (ADMIN 이 업로드해 등록, 유저가 카드 배경으로 선택)
+model CardBackgroundImage {
+  id       Int    @id @default(autoincrement()) @db.UnsignedInt
+  imageUrl String @map("image_url") @db.VarChar(500) // 전체 url 저장 (ex: https:// ... /282x400.webp
+
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  @@map("card_background_images")
+}
+
 // 프로필 카드 경험
 model Experience {
   id          Int     @id @default(autoincrement()) @db.UnsignedInt

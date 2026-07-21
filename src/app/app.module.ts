@@ -18,6 +18,7 @@ import { AffiliationStatusesModule } from '@/module/affiliation-statuses/affilia
 import { PurposesModule } from '@/module/purposes/purposes.module';
 import { CollectionsModule } from '@/module/collections/collections.module';
 import { ConnectionsModule } from '@/module/connections/connections.module';
+import { CardBackgroundImagesModule } from '@/module/card-background-images/card-background-images.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ConnectionsModule } from '@/module/connections/connections.module';
     PurposesModule,
     CollectionsModule,
     ConnectionsModule,
+    CardBackgroundImagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

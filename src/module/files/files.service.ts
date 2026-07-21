@@ -7,10 +7,13 @@ import { UploadImageResponse } from '@/module/files/type/upload-image-response.t
 @Injectable()
 export class FilesService {
   // 프로필 이미지 파생 사이즈(정사각, px). 원본은 {uuid} 로 별도 저장
-  private static readonly PROFILE_IMAGE_SIZES = [72, 60, 48];
+  private static readonly PROFILE_IMAGE_SIZES = [72, 56, 48];
 
   // 개성 이미지 파생 사이즈(정사각, px)
   private static readonly PERSONALITY_IMAGE_SIZES = [36];
+
+  // 카드 배경 이미지 크기(px). 정사각이 아니므로 width/height 로 지정
+  private static readonly CARD_BACKGROUND_SIZE = { width: 282, height: 400 };
 
   constructor(private readonly s3Service: S3Service) {}
 
@@ -83,6 +86,38 @@ export class FilesService {
     await Promise.all(uploads);
 
     // uuid 까지의 base URL 반환 → 소비 시 `${url}/36.webp` 처럼 접근
+    return { url: this.s3Service.getPublicUrl(basePrefix) };
+  }
+
+  async uploadCardBackgroundImage(
+    file: Express.Multer.File,
+  ): Promise<UploadImageResponse> {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const basePrefix = `card-background/${yyyy}/${mm}/${randomUUID()}`;
+
+    const { width, height } = FilesService.CARD_BACKGROUND_SIZE;
+
+    // 원본은 리사이즈 없이 webp 로 변환해 origin.webp 로 저장
+    const origin = await sharp(file.buffer).webp().toBuffer();
+    // 파생: 카드 표시용으로 리사이즈+크롭해 {width}x{height}.webp 로 저장
+    const resized = await this.resizeImage(file.buffer, width, height);
+
+    await Promise.all([
+      this.s3Service.uploadFile(
+        origin,
+        `${basePrefix}/origin.webp`,
+        'image/webp',
+      ),
+      this.s3Service.uploadFile(
+        resized,
+        `${basePrefix}/${width}x${height}.webp`,
+        'image/webp',
+      ),
+    ]);
+
+    // uuid 까지의 base URL 반환 → 소비 시 `${url}/282x400.webp` 처럼 접근
     return { url: this.s3Service.getPublicUrl(basePrefix) };
   }
 
