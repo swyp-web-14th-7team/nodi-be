@@ -3,6 +3,7 @@ import { PrismaService } from '@/lib/prisma/prisma.service';
 import { Prisma, User, UserProfileCard } from '@/prisma/client';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
+import { UpdateDefaultProfileCardDto } from '@/module/profile-cards/dto/update-default-profile-card.dto';
 import { FindPublicProfileCardDto } from '@/module/profile-cards/dto/find-public-profile-card.dto';
 import {
   defaultProfileCardIncludeOptions,
@@ -18,13 +19,22 @@ import { PaginationResult } from '@/common/type/pagination-result.type';
 export class ProfileCardsRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
-  /** 유저의 기본(default) 카드 조회 (skills/interests/personalities 포함) */
+  /** 유저의 기본(default) 카드 조회 (skills/interests/links 포함) */
   async findDefaultProfileCard(
     userId: string,
   ): Promise<DefaultUserProfileCard | null> {
     return this.prismaService.userProfileCard.findUnique({
       where: { userId_isDefault: { userId, isDefault: true } },
       include: defaultProfileCardIncludeOptions,
+    });
+  }
+
+  async findDefaultDisplayProfileCard(
+    userId: string,
+  ): Promise<DisplayProfileCard | null> {
+    return this.prismaService.userProfileCard.findUnique({
+      where: { userId_isDefault: { userId, isDefault: true } },
+      include: displayProfileCardIncludeOptions,
     });
   }
 
@@ -252,6 +262,32 @@ export class ProfileCardsRepository {
                 sortOrder,
               }),
             ),
+          },
+        }),
+      },
+    });
+  }
+
+  /**
+   * 기본(default) 카드 수정
+   * - 유저당 하나뿐인 기본 카드를 (userId, isDefault) 유니크 키로 특정해 수정
+   * - nickname: 값이 있을 때만 변경 (undefined 는 그대로)
+   * - links: 전체 교체(기존 삭제 후 재생성) — value 가 항목마다 달라 부분 병합이 아닌 통째 덮어쓰기
+   * - 기본 카드가 없으면 update 대상이 없어 P2025 가 발생한다.
+   */
+  async updateDefaultProfileCard(
+    userId: string,
+    { nickname, links }: UpdateDefaultProfileCardDto,
+  ): Promise<DisplayProfileCard> {
+    return this.prismaService.userProfileCard.update({
+      where: { userId_isDefault: { userId, isDefault: true } },
+      include: displayProfileCardIncludeOptions,
+      data: {
+        nickname,
+        ...(links !== undefined && {
+          profileCardLinks: {
+            deleteMany: {},
+            create: links.map(({ type, value }) => ({ type, value })),
           },
         }),
       },

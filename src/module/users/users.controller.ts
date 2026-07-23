@@ -22,7 +22,6 @@ import {
 import { ApiResponseSuccess } from '@/common/decorator/api-response-success.decorator';
 import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
 import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
-import { UserWithDefaultCard } from '@/module/users/users.type';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationType } from '@/common/type/pagination.type';
 import { AdminUserResponse } from '@/module/users/type/admin-user-response.type';
@@ -76,13 +75,9 @@ export class UsersController {
   @Auth(UserRole.USER, UserRole.ADMIN)
   @ApiResponseSuccess(UserResponse)
   async getMe(@CurrentUser() user: User): Promise<UserResponse> {
-    const data: UserWithDefaultCard | User | null =
-      await this.usersService.findUnique(
-        {
-          id: user.id,
-        },
-        true,
-      );
+    const data: User | null = await this.usersService.findUnique({
+      id: user.id,
+    });
     if (!data) throw new NotFoundException('유저를 찾을 수 없습니다.');
     return UserResponse.fromUser(data);
   }
