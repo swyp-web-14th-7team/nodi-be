@@ -22,6 +22,7 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationType } from '@/common/type/pagination.type';
 import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
 import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
+import { UpdateDefaultProfileCardDto } from '@/module/profile-cards/dto/update-default-profile-card.dto';
 
 @Controller('profile-cards')
 export class ProfileCardsController {
@@ -81,6 +82,56 @@ export class ProfileCardsController {
     const item: DisplayProfileCard =
       await this.profileCardsService.findOneDisplayProfileCard(user, id);
     return ProfileCardResponse.fromProfileCard(item);
+  }
+
+  /**
+   * 기본(Default) 프로필 카드 조회
+   * @remarks
+   * 로그인한 유저 본인의 기본(Default) 카드를 조회합니다.
+   *
+   * 기본 카드는 온보딩 시 생성되는 원본 카드로, 유저당 하나만 존재합니다.
+   *
+   * 아직 카드를 생성하지 않아 기본 카드가 없으면 404 를 반환합니다.
+   * @param user
+   */
+  @Get('/default')
+  @Auth(UserRole.ADMIN, UserRole.USER)
+  @ApiResponseSuccess(ProfileCardResponse)
+  @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
+  async getDefaultProfileCard(
+    @CurrentUser() user: User,
+  ): Promise<ProfileCardResponse> {
+    const item: DisplayProfileCard =
+      await this.profileCardsService.findDefaultDisplayProfileCard(user);
+    return ProfileCardResponse.fromProfileCard(item);
+  }
+
+  /**
+   * 기본(Default) 프로필 카드 수정
+   * @remarks
+   * 로그인한 유저 본인의 기본(Default) 카드를 수정합니다.
+   * 요청 본문의 모든 값은 Optional 하며, 넘긴 값만 반영됩니다.
+   *
+   * - nickname: 넘기면 변경, 생략하면 기존 값 유지 (1 ~ 255자)
+   * - links: 전체 교체(넘긴 목록으로 기존 링크를 통째로 덮어씀). 각 항목 type 매핑은 다음과 같습니다.
+   *   0: EMAIL, 1: INSTAGRAM, 2: GITHUB, 3: LINKEDIN, 4: BEHANCE, 5: NOTION, 6: WEBSITE
+   *
+   * ★ 기본 카드는 온보딩 시 생성되는 원본 카드로, 아직 카드가 없으면 404 를 반환합니다.
+   *   응답은 관계까지 포함한 완전한 카드(단건 조회와 동일 형태)입니다.
+   * @param user
+   * @param dto
+   */
+  @Patch('/default')
+  @Auth(UserRole.ADMIN, UserRole.USER)
+  @ApiResponseSuccess(ProfileCardResponse)
+  @ApiNotFoundResponse({ description: '기본 카드가 존재하지 않습니다.' })
+  async updateDefaultProfileCard(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateDefaultProfileCardDto,
+  ): Promise<ProfileCardResponse> {
+    const data: DisplayProfileCard =
+      await this.profileCardsService.updateDefaultProfileCard(user, dto);
+    return ProfileCardResponse.fromProfileCard(data);
   }
 
   /**

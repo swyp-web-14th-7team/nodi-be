@@ -5,8 +5,6 @@ import { UserRole } from '@/common/enum/user-role.enum';
 import { LoginParams } from '@/module/users/type/login-params.type';
 import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
 import {
-  UserWithDefaultCard,
-  userWithDefaultCardIncludeOptions,
   UserWithLastLogin,
   userWithLastLoginIncludeOptions,
 } from '@/module/users/users.type';
@@ -23,16 +21,6 @@ export class UsersRepository {
   ): Promise<User | null> {
     return this.prismaService.user.findUnique({
       where: { ...whereOptions, deletedAt: null },
-    });
-  }
-
-  /** 단건 조회 - 탈퇴 유저는 제외, default User 포함 */
-  async findUniqueUserWithDefaultCard(
-    whereOptions: Prisma.UserWhereUniqueInput,
-  ): Promise<UserWithDefaultCard | null> {
-    return this.prismaService.user.findUnique({
-      where: { ...whereOptions, deletedAt: null },
-      include: userWithDefaultCardIncludeOptions,
     });
   }
 
@@ -67,14 +55,10 @@ export class UsersRepository {
   }
 
   /** 프로필 수정 */
-  async updateUser(
-    id: string,
-    dto: UpdateProfileDto,
-  ): Promise<UserWithDefaultCard> {
+  async updateUser(id: string, dto: UpdateProfileDto): Promise<User> {
     return this.prismaService.user.update({
       where: { id },
       data: { ...dto },
-      include: userWithDefaultCardIncludeOptions,
     });
   }
 

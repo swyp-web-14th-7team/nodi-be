@@ -6,10 +6,7 @@ import { LoginParams } from '@/module/users/type/login-params.type';
 import { Prisma } from '@/prisma/client';
 import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
 import { UsersRepository } from '@/module/users/users.repository';
-import {
-  UserWithDefaultCard,
-  UserWithLastLogin,
-} from '@/module/users/users.type';
+import { UserWithLastLogin } from '@/module/users/users.type';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 
@@ -26,17 +23,11 @@ export class UsersService {
 
   async findUnique(
     whereOptions: Prisma.UserWhereUniqueInput,
-    withDefault: boolean = false,
-  ): Promise<UserWithDefaultCard | User | null> {
-    return withDefault
-      ? this.usersRepository.findUniqueUserWithDefaultCard(whereOptions)
-      : this.usersRepository.findUniqueUser(whereOptions);
+  ): Promise<User | null> {
+    return this.usersRepository.findUniqueUser(whereOptions);
   }
 
-  async updateMyProfile(
-    user: User,
-    dto: UpdateProfileDto,
-  ): Promise<UserWithDefaultCard> {
+  async updateMyProfile(user: User, dto: UpdateProfileDto): Promise<User> {
     return this.usersRepository.updateUser(user.id, dto);
   }
 
