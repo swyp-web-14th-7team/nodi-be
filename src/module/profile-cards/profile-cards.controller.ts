@@ -61,6 +61,28 @@ export class ProfileCardsController {
   }
 
   /**
+   * 기본(Default) 프로필 카드 조회
+   * @remarks
+   * 로그인한 유저 본인의 기본(Default) 카드를 조회합니다.
+   *
+   * 기본 카드는 온보딩 시 생성되는 원본 카드로, 유저당 하나만 존재합니다.
+   *
+   * 아직 카드를 생성하지 않아 기본 카드가 없으면 404 를 반환합니다.
+   * @param user
+   */
+  @Get('/default')
+  @Auth(UserRole.ADMIN, UserRole.USER)
+  @ApiResponseSuccess(ProfileCardResponse)
+  @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
+  async getDefaultProfileCard(
+    @CurrentUser() user: User,
+  ): Promise<ProfileCardResponse> {
+    const item: DisplayProfileCard =
+      await this.profileCardsService.findDefaultDisplayProfileCard(user);
+    return ProfileCardResponse.fromProfileCard(item);
+  }
+
+  /**
    * 유저 프로필 카드 단건 조회
    * @remarks
    * 로그인한 유저 본인이 소유한 프로필 카드를 id 로 조회합니다.
@@ -81,28 +103,6 @@ export class ProfileCardsController {
   ): Promise<ProfileCardResponse> {
     const item: DisplayProfileCard =
       await this.profileCardsService.findOneDisplayProfileCard(user, id);
-    return ProfileCardResponse.fromProfileCard(item);
-  }
-
-  /**
-   * 기본(Default) 프로필 카드 조회
-   * @remarks
-   * 로그인한 유저 본인의 기본(Default) 카드를 조회합니다.
-   *
-   * 기본 카드는 온보딩 시 생성되는 원본 카드로, 유저당 하나만 존재합니다.
-   *
-   * 아직 카드를 생성하지 않아 기본 카드가 없으면 404 를 반환합니다.
-   * @param user
-   */
-  @Get('/default')
-  @Auth(UserRole.ADMIN, UserRole.USER)
-  @ApiResponseSuccess(ProfileCardResponse)
-  @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
-  async getDefaultProfileCard(
-    @CurrentUser() user: User,
-  ): Promise<ProfileCardResponse> {
-    const item: DisplayProfileCard =
-      await this.profileCardsService.findDefaultDisplayProfileCard(user);
     return ProfileCardResponse.fromProfileCard(item);
   }
 
