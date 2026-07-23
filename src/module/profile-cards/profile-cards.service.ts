@@ -48,7 +48,7 @@ export class ProfileCardsService {
     const defaultCard: DisplayProfileCard | null =
       await this.profileCardsRepository.findDefaultDisplayProfileCard(user.id);
     if (!defaultCard)
-      throw new NotFoundException('기본 카드가 존재하지 않습니다.');
+      throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
     return defaultCard;
   }
 
