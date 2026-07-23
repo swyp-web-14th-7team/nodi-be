@@ -24,7 +24,6 @@ import { ApiResponsePagination } from '@/common/decorator/api-response-paginatio
 import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationType } from '@/common/type/pagination.type';
-import { AdminUserResponse } from '@/module/users/type/admin-user-response.type';
 
 // 탈퇴 시 로그인 세션(리프레시 토큰) 쿠키를 함께 제거한다. (auth.controller 와 동일 키/옵션)
 const REFRESH_TOKEN_KEY: string = 'refresh_token';
@@ -54,13 +53,13 @@ export class UsersController {
    */
   @Get()
   @Auth(UserRole.ADMIN)
-  @ApiResponsePagination(AdminUserResponse)
+  @ApiResponsePagination(UserResponse)
   async getAllUsers(
     @Query() pagination: PaginationDto,
-  ): Promise<PaginationType<AdminUserResponse>> {
+  ): Promise<PaginationType<UserResponse>> {
     const { total, items } = await this.usersService.findAllUsers(pagination);
     return {
-      items: items.map((item) => AdminUserResponse.fromUser(item)),
+      items: items.map((item) => UserResponse.fromUser(item)),
       metadata: { ...pagination, total },
     };
   }
