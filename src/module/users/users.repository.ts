@@ -67,6 +67,7 @@ export class UsersRepository {
    *  1) deletedAt 설정 + email 마스킹(unique 해제 → 동일 이메일 재가입 허용)
    *  2) 인증(UserAuth) 삭제(provider·providerId unique 해제 → 재가입 시 충돌 방지)
    *  3) 리프레시 토큰 전체 무효화(모든 기기 세션 종료)
+   *  4) 유저의 모든 프로필 카드 비공개 처리(isActive=false → 공개 목록에서 노출 차단)
    *
    * 유저 정보 자체는 일정 기간 보관을 위해 남긴다.
    */
@@ -85,6 +86,11 @@ export class UsersRepository {
       this.prismaService.refreshToken.updateMany({
         where: { userId: user.id, revokedAt: null },
         data: { revokedAt: new Date() },
+      }),
+      // 공개 중인 모든 프로필 카드를 비공개로 전환(공개 목록에서 노출 차단). 카드 자체는 보관을 위해 남긴다.
+      this.prismaService.userProfileCard.updateMany({
+        where: { userId: user.id, isActive: true },
+        data: { isActive: false },
       }),
     ]);
   }
