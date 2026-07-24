@@ -40,6 +40,12 @@ export class UpdateProfileCardDto {
   @Min(1)
   personalityId?: number;
 
+  @ApiPropertyOptional({ description: '목적 ID (팀 빌딩/친목/커피챗 등)' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  purposeId?: number;
+
   @ApiPropertyOptional({ description: '한 줄 소개' })
   @IsNotEmpty()
   @IsString()

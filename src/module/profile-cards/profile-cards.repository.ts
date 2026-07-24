@@ -73,6 +73,7 @@ export class ProfileCardsRepository {
     purposeId,
     affiliationStatusId,
     jobTypeId,
+    skillIds,
     keywords,
   }: FindPublicProfileCardDto): Promise<PaginationResult<DisplayProfileCard>> {
     const where: Prisma.UserProfileCardWhereInput = {
@@ -81,6 +82,10 @@ export class ProfileCardsRepository {
       purposeId,
       affiliationStatusId,
       jobTypeId,
+      // 넘긴 스킬 중 하나라도 보유한 카드
+      ...(skillIds !== undefined && {
+        profileCardSkills: { some: { skillId: { in: skillIds } } },
+      }),
       // 닉네임 또는 관심사 이름 부분 일치 검색
       ...(keywords && {
         OR: [
@@ -201,6 +206,7 @@ export class ProfileCardsRepository {
       skillIds,
       interestIds,
       personalityId,
+      purposeId,
       description,
       affiliationStatusId,
       affiliation,
@@ -223,6 +229,9 @@ export class ProfileCardsRepository {
         isActive,
         ...(personalityId !== undefined && {
           personalityId: personalityId,
+        }),
+        ...(purposeId !== undefined && {
+          purposeId: purposeId,
         }),
         ...(skillIds !== undefined && {
           profileCardSkills: {
