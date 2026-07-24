@@ -4,7 +4,9 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -71,13 +73,10 @@ export class PurposesController {
   @ApiBadRequestResponse({ description: 'id 는 숫자입니다.' })
   @ApiNotFoundResponse({ description: '목적 을 찾을 수 없습니다.' })
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdatePurposeDto,
   ): Promise<PurposeResponse> {
-    const targetId: number = Number(id);
-    if (Number.isNaN(targetId))
-      throw new BadRequestException('id 는 숫자입니다.');
-    const data: Purpose = await this.purposesService.update(targetId, dto);
+    const data: Purpose = await this.purposesService.update(id, dto);
     return PurposeResponse.fromPurpose(data);
   }
 
@@ -88,13 +87,16 @@ export class PurposesController {
   @Delete(':id')
   @Auth(UserRole.ADMIN)
   @ApiResponseSuccess(PurposeResponse)
-  @ApiBadRequestResponse({ description: 'id 는 숫자입니다.' })
+  @ApiBadRequestResponse({
+    description: 'id = 1 인 목적은 삭제가 불가능합니다.',
+  })
   @ApiNotFoundResponse({ description: '목적 을 찾을 수 없습니다.' })
-  async delete(@Param('id') id: string): Promise<PurposeResponse> {
-    const targetId: number = Number(id);
-    if (Number.isNaN(targetId))
-      throw new BadRequestException('id 는 숫자입니다.');
-    const data: Purpose = await this.purposesService.delete(targetId);
+  async delete(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<PurposeResponse> {
+    if (id === 1)
+      throw new BadRequestException('id = 1 인 목적은 삭제가 불가능합니다.');
+    const data: Purpose = await this.purposesService.delete(id);
     return PurposeResponse.fromPurpose(data);
   }
 }
