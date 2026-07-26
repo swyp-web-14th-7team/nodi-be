@@ -32,7 +32,8 @@ export class PurposesController {
    * 모든 purposes 를 조회합니다.
    *
    * @remarks
-   * purpose 는 createdAt 이 없어 sort 는 id·name 만 허용하며 기본값은 name 입니다.
+   * purpose 는 createdAt 이 없어 sort 는 id·name·sortOrder 만 허용하며
+   * 기본값은 sortOrder 오름차순입니다.
    * @param dto
    */
   @Get()
@@ -64,6 +65,13 @@ export class PurposesController {
 
   /**
    * purposes 수정 (ADMIN)
+   *
+   * @remarks
+   * `sortOrder`를 변경하면 이동 방향에 따라 사이에 있는 목적들의 순서가 자동으로 조정됩니다.
+   *
+   * 예를 들어 `A: 0, B: 1, C: 2, D: 3`인 상태에서 D를 `sortOrder: 1`로 수정하면
+   * `A: 0, D: 1, B: 2, C: 3`이 됩니다.
+   * 반대로 A를 `sortOrder: 2`로 수정하면 `B: 0, C: 1, A: 2, D: 3`이 됩니다.
    * @param id
    * @param dto
    */

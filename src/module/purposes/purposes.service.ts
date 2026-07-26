@@ -19,13 +19,13 @@ export class PurposesService {
   }
 
   async update(id: number, dto: UpdatePurposeDto): Promise<Purpose> {
-    await this.findByIdOrThrow(id);
-    return this.purposesRepository.updatePurpose(id, dto);
+    const target = await this.findByIdOrThrow(id);
+    return this.purposesRepository.updatePurpose(id, target.sortOrder, dto);
   }
 
   async delete(id: number): Promise<Purpose> {
-    await this.findByIdOrThrow(id);
-    return this.purposesRepository.deletePurpose(id);
+    const target = await this.findByIdOrThrow(id);
+    return this.purposesRepository.deletePurpose(id, target.sortOrder);
   }
 
   private async findByIdOrThrow(id: number): Promise<Purpose> {

@@ -1,5 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, Length } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
+} from 'class-validator';
 
 export class UpdatePurposeDto {
   @ApiPropertyOptional()
@@ -8,4 +15,10 @@ export class UpdatePurposeDto {
   @IsNotEmpty()
   @IsOptional()
   name?: string;
+
+  @ApiPropertyOptional({ description: '표시 순서', minimum: 0 })
+  @Min(0)
+  @IsInt()
+  @IsOptional()
+  sortOrder?: number;
 }
