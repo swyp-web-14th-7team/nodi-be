@@ -52,7 +52,10 @@ export class ProfileExperienceResponse {
   @ApiProperty({ description: '관련 url', nullable: true, maxLength: 500 })
   relatedUrl: string | null;
 
-  @ApiProperty({ description: '경험 순서 (1이면 대표경험)', minimum: 1 })
+  @ApiProperty({
+    description: '경험 순서 (대표 경험은 0, 나머지는 1부터 시작)',
+    minimum: 0,
+  })
   sortOrder: number;
 
   static fromExperience(item: Experience): ProfileExperienceResponse {
