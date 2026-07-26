@@ -95,6 +95,16 @@ export class ProfileCardsRepository {
               some: { interest: { name: { contains: keywords } } },
             },
           },
+          {
+            jobType: {
+              name: { contains: keywords },
+            },
+          },
+          {
+            profileCardSkills: {
+              some: { skill: { name: { contains: keywords } } },
+            },
+          },
         ],
       }),
     };
