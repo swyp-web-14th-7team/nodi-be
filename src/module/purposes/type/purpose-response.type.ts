@@ -8,10 +8,14 @@ export class PurposeResponse {
   @ApiProperty()
   name: string;
 
+  @ApiProperty({ description: '표시 순서', minimum: 0 })
+  sortOrder: number;
+
   static fromPurpose(item: Purpose): PurposeResponse {
     return {
       id: item.id,
       name: item.name,
+      sortOrder: item.sortOrder,
     };
   }
 }

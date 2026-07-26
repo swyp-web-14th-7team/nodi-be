@@ -372,11 +372,11 @@ async function main() {
   console.log(`  [관심사] ${INTEREST_SEED.length}개 시드 완료`);
 
   // 목적 upsert
-  for (const purposeName of PURPOSE_SEED) {
+  for (const [sortOrder, purposeName] of PURPOSE_SEED.entries()) {
     await prisma.purpose.upsert({
       where: { name: purposeName },
-      update: {},
-      create: { name: purposeName },
+      update: { sortOrder },
+      create: { name: purposeName, sortOrder },
     });
   }
   console.log(`  [목적] ${PURPOSE_SEED.length}개 시드 완료`);
