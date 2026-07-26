@@ -17,6 +17,12 @@
 | `alloy/config.alloy` | 수집 대상 탐색, 라벨링, pino JSON 파싱 |
 | `loki/loki-config.yml` | 저장소·보존 기간 |
 | `grafana/provisioning/datasources/loki.yml` | Loki 데이터소스 자동 등록 |
+| `grafana/dashboards/nodi-be-logs.json` | UI에서 편집할 수 있는 초기 샘플 대시보드 |
+
+샘플 대시보드는 Grafana 기동 시 자동 등록되며, 이후에는 **Dashboards → nodi-be 로그**에서
+패널·쿼리·배치를 수정하고 저장하면 됩니다. UI에서 저장한 내용은 `grafana-data` 볼륨에
+보관됩니다. 샘플 JSON 파일을 나중에 변경하면 프로비저닝 과정에서 UI 변경 내용이 덮어써질
+수 있으므로, 초기 샘플을 바꿀 때만 수정하세요.
 
 ## 기동
 
