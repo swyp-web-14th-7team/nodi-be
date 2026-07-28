@@ -45,6 +45,11 @@ limits_config:
   reject_old_samples: true
   reject_old_samples_max_age: 336h
 
+# Grafana Logs Drilldown 의 Patterns 탭이 이걸 사용한다. OSS 기본값은 꺼짐이라
+# 켜지 않으면 탭이 비어 보인다. 켠 시점 이후 로그부터 패턴이 잡히고, 과거 로그엔 소급되지 않음.
+pattern_ingester:
+  enabled: true
+
 compactor:
   working_directory: /loki/compactor
   delete_request_store: filesystem

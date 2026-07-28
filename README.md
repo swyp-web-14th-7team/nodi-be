@@ -1,98 +1,178 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# nodi-be
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+프로필 카드 공유 서비스의 백엔드 API 서버입니다. 사용자가 자신의 프로필을 카드 형태로 만들어
+공유하고, 다른 사람과 명함처럼 연결(커넥션)을 맺어 컬렉션으로 관리하는 서비스를 제공합니다.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+- **API 문서(Swagger)**: `/api-docs` (OpenAPI JSON: `/docs`)
+- **헬스체크**: `GET /health`
 
-## Description
+## 기술 스택
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+| 구분 | 사용 기술 |
+| --- | --- |
+| 언어 / 런타임 | TypeScript, Node.js 22 |
+| 프레임워크 | NestJS 11 (Express 플랫폼) |
+| ORM / DB | Prisma 7 + `@prisma/adapter-mariadb` (MariaDB / MySQL) |
+| 캐시 / 세션 | Redis 7 (`ioredis`) — refresh token 등 저장, AOF 영속화 |
+| 인증 | JWT (access / refresh), OAuth 2.0 — Google · Naver · Kakao |
+| 파일 / 이미지 | AWS S3 + CloudFront, `sharp` (이미지 리사이즈·변환) |
+| 검증 / 직렬화 | `class-validator`, `class-transformer` |
+| 로깅 | `nestjs-pino` (`pino-http`), 개발 환경은 `pino-pretty` |
+| API 문서 | `@nestjs/swagger` (OpenAPI 3.1) |
+| ID | ULID (요청 ID·리소스 식별자) |
+| 테스트 | Jest, Supertest |
+| 린트 / 포맷 | ESLint 9, Prettier (single quote, trailing comma all, printWidth 80) |
 
-## Project setup
+## 프로젝트 구조
 
-```bash
-$ npm install
+```
+src/
+├── main.ts                # 부트스트랩: 전역 파이프·인터셉터·필터, CORS, Swagger, pino 로거
+├── app/                   # 루트 모듈, 헬스체크 컨트롤러
+├── common/                # 공통 요소 (도메인 비종속)
+│   ├── decorator/         # @Auth, @Roles, @CurrentUser, Swagger 응답 데코레이터
+│   ├── dto/ · type/       # 페이지네이션, 공통 응답 타입
+│   ├── filter/            # PrismaExceptionFilter (Prisma 에러 → HTTP)
+│   ├── guard/             # AuthGuard, RolesGuard
+│   ├── interceptor/       # TransformInterceptor (성공 응답 규격화)
+│   └── enum/              # Provider, UserRole 등
+├── lib/                   # 외부 인프라 연동 모듈
+│   ├── prisma/ · redis/ · s3/
+│   ├── oauth/             # provider별 전략 + resolver
+│   └── logger/            # pino 설정
+└── module/                # 도메인 모듈 (controller · service · repository · dto · type)
+    ├── auth/ · users/ · profile-cards/
+    ├── skills/ · skill-categories/ · job-type/ · interests/
+    ├── personalities/ · affiliation-statuses/ · purposes/
+    ├── collections/ · connections/
+    └── files/ · card-background-images/
 ```
 
-## Compile and run the project
+경로 별칭(`tsconfig.json`)
 
-```bash
-# development
-$ npm run start
+- `@/*` → `src/*`
+- `@/prisma/*` → `prisma/generated/prisma/*`
 
-# watch mode
-$ npm run start:dev
+## 컨벤션
 
-# production mode
-$ npm run start:prod
+### 도메인 모듈 구성
+각 도메인은 `controller` → `service` → `repository` 계층으로 나뉩니다. DTO는 `dto/`,
+응답·도메인 타입은 `type/` 하위에 둡니다. 파일명은 `kebab-case`, 역할 접미사를 붙입니다
+(`*.controller.ts`, `*.service.ts`, `*.repository.ts`, `*.dto.ts`, `*.type.ts`).
+
+### 응답 규격
+모든 성공 응답은 `TransformInterceptor`가 아래 형태로 감싸고 **상태코드를 200으로 통일**합니다.
+
+```jsonc
+{ "success": true, "status": 200, "data": { /* ... */ } }
 ```
 
-## Run tests
+Prisma 예외는 `PrismaExceptionFilter`가 적절한 HTTP 상태로 변환합니다. 컨트롤러의 요약 설명은
+`@nestjs/swagger` 플러그인이 JSDoc 주석에서 자동 추출합니다(`introspectComments`).
+
+### 검증
+전역 `ValidationPipe`를 `whitelist: true`, `transform: true`로 사용합니다. 요청은 DTO
+인스턴스로 변환되어 기본값 주입과 `@Type` 기반 타입 변환이 적용됩니다.
+
+### 코드 스타일
+커밋 전 `npm run format`, `npm run lint`를 실행합니다. 커밋 메시지는
+`feat:`, `fix:`, `chore:` 등의 접두사를 사용합니다.
+
+## 로깅
+
+`nestjs-pino` 기반 구조적(JSON) 로깅입니다. (`src/lib/logger/logger.module.ts`)
+
+- **요청 추적**: 요청마다 ULID `req.id`를 발급하고 `X-Request-Id` 헤더로 응답합니다.
+  기존 `X-Request-Id`가 있으면 재사용하므로 nginx→백엔드 간 요청을 한 ID로 묶을 수 있습니다.
+- **환경별 출력**: `NODE_ENV=prod`는 JSON(레벨을 문자열로 출력, 민감 헤더 redact),
+  개발 환경은 `pino-pretty`로 사람이 읽기 쉬운 형식 + `debug` 레벨.
+- **헬스체크 제외**: `GET /health`는 Docker HEALTHCHECK가 자주 호출하므로 자동 로그에서 제외합니다.
+
+운영에서는 컨테이너 로그를 **Alloy → Loki → Grafana** 스택으로 수집·조회합니다. 아키텍처,
+LogQL 조회 예시, 트러블슈팅은 [`monitoring/README.md`](./monitoring/README.md)를 참고하세요.
+
+## 로컬 개발
+
+### 요구사항
+- Node.js 22
+- MariaDB / MySQL, Redis (또는 접근 가능한 원격 인스턴스)
+
+### 설정 및 실행
 
 ```bash
-# unit tests
-$ npm run test
+# 1) 의존성 설치
+npm ci
 
-# e2e tests
-$ npm run test:e2e
+# 2) 환경변수 설정 (.env.example 참고)
+cp .env.example .env
 
-# test coverage
-$ npm run test:cov
+# 3) Prisma 클라이언트 생성 & 마이그레이션
+npx prisma generate
+npx prisma migrate dev
+
+# (선택) 시드 데이터 삽입
+npx prisma db seed
+
+# 4) 개발 서버 (watch)
+npm run start:dev
 ```
 
-## Deployment
+기본 포트는 `3000`(`PORT` 환경변수로 변경). 주요 환경변수는 `.env.example`에 정리되어 있습니다
+— DB, OAuth(Google/Naver/Kakao) 자격증명, Redis, AWS(S3/CloudFront), JWT 시크릿 등.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### 스크립트
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| 명령 | 설명 |
+| --- | --- |
+| `npm run start:dev` | watch 모드 개발 서버 |
+| `npm run start:prod` | 빌드 산출물(`dist/src/main`) 실행 |
+| `npm run build` | `nest build` |
+| `npm run lint` | ESLint (`--fix`) |
+| `npm run format` | Prettier 포맷 |
+| `npm test` / `test:cov` / `test:e2e` | 단위 / 커버리지 / E2E 테스트 |
+
+## 빌드 & 배포
+
+### 이미지 빌드 (CI)
+`main` 브랜치에 push(=PR 머지)되면 GitHub Actions가 **linux/arm64** 이미지를 빌드해
+GHCR(`ghcr.io/swyp-web-14th-7team/nodi-be`)에 푸시합니다. (`.github/workflows/build-image.yml`)
+
+- 빌드 전 `package.json`의 `version` 태그가 GHCR에 이미 있으면 **실패**시켜 버전 누락을 방지합니다.
+  → 배포마다 `package.json` 버전을 올려야 합니다.
+- 태그: `latest`, 커밋 SHA(불변 핀), `v<version>`(릴리스 식별).
+- 멀티스테이지 `Dockerfile`(node:22-alpine)로 빌드 후 dev 의존성을 제거한 런타임 이미지를 생성하며,
+  `/health` 기반 `HEALTHCHECK`를 포함합니다.
+
+### 무중단 배포 (Blue-Green)
+운영 서버는 `docker-compose.yml` + nginx로 **Blue-Green 무중단 배포**를 합니다.
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+docker compose pull          # ★ 먼저 GHCR에서 새 이미지를 받아둘 것
+./scripts/deploy.sh
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+`scripts/deploy.sh` 흐름:
 
-## Resources
+1. 현재 활성 색 파악 (`nginx/active/upstream.conf`)
+2. 반대 색을 새 이미지로 기동
+3. 새 색 **헬스체크** — 모든 replica가 healthy가 될 때까지 (실패 시 배포 취소, 현재 색 무사)
+4. `upstream.conf`를 새 색으로 교체
+5. `nginx -s reload` (graceful, 무중단 전환)
+6. **스모크 테스트** — nginx 경유 실제 200 응답 확인 (실패 시 upstream 롤백)
+7. 이전 색 종료(stop) — 빠른 롤백을 위해 컨테이너 보존
 
-Check out a few resources that may come in handy when working with NestJS:
+> 상세 절차·롤백 방법·주의사항(특히 `docker compose pull` 누락 함정)은 `docker-compose.yml`
+> 하단과 `scripts/deploy.sh` 상단 주석에 정리되어 있습니다.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 구성 요소 (docker compose)
 
-## Support
+| 서비스 | 역할 |
+| --- | --- |
+| `backend_blue` / `backend_green` | 앱 컨테이너 (각 2 replica) — Blue-Green 대상 |
+| `nginx` | 리버스 프록시 / upstream 전환 (호스트 `8080`) |
+| `redis` | 캐시·토큰 저장 (AOF 영속, 내부망 전용) |
+| `loki` / `alloy` / `grafana` | 로그 수집·조회 스택 (배포와 수명주기 분리) |
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## 라이선스
 
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED (비공개)

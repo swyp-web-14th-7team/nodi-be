@@ -147,6 +147,57 @@ sum(rate({service=~"backend_.+", level="error"}[1m]))
 > 안 그러면 로그 한 줄이 각각 별개 시계열이 돼서 분위수가 계산되지 않습니다
 > (대시보드 "응답시간" 패널 참고).
 
+## Logs Drilldown (쿼리 없이 훑어보기)
+
+왼쪽 **Drilldown → Logs**. Explore 가 LogQL 을 직접 쓰는 곳이라면, Drilldown 은 라벨·필드 분포를
+먼저 보여주고 클릭으로 좁혀 들어가는 UI 입니다. **어디가 문제인지 모를 때** 쓰고, 볼 것이 정해져
+있으면 위의 LogQL 을 붙여넣는 편이 빠릅니다.
+
+메뉴에 **Drilldown 이 없으면** 플러그인이 안 받아진 것입니다. `docker-compose.yml` 의
+`GF_INSTALL_PLUGINS: grafana-lokiexplore-app` 를 기동 시 grafana.com 에서 내려받는 구조라,
+서버 egress 가 막혀 있으면 **에러 없이 메뉴만 안 뜹니다**.
+
+```bash
+docker compose logs grafana | grep -i plugin
+```
+
+진입 화면의 서비스 목록은 `service_name` 라벨 값입니다. 아래 [라벨](#라벨) 절에서 "Loki 3 가
+자동으로 붙여서 그대로 뒀다" 고 한 그 라벨이 여기서 쓰입니다. 그래서 추가 설정 없이
+`backend_blue` / `backend_green` / `nginx` / `redis` 가 그대로 나옵니다.
+
+서비스를 고르면 탭 4개입니다.
+
+| 탭 | 하는 일 |
+| --- | --- |
+| Logs | 로그 줄 목록 |
+| Labels | 라벨 값 분포 → 클릭하면 필터로 붙음 (`level`, `container`) |
+| Fields | pino JSON 필드를 자동 감지 (`res_statusCode`, `req_url`, `responseTime`) |
+| Patterns | 비슷한 로그를 템플릿으로 묶어 보여줌 |
+
+Fields 탭이 이 프로젝트에선 가장 쓸모 있습니다. `| json | res_statusCode="500"` 를 손으로 치는
+대신 `res_statusCode` 필드를 열면 상태코드 비중이 막대로 나오고, 500 을 클릭하면 필터가 붙습니다.
+
+**500 에러를 쫓는 흐름**
+
+1. Drilldown → Logs → `backend_blue`
+2. Labels 탭 → `level` → `error` (라벨이라 인덱스에서 바로 걸러짐)
+3. Fields 탭 → `req_url` → 어느 경로에 몰렸는지 보고 클릭
+4. Logs 탭에서 줄을 펼쳐 `req_id` 복사
+5. 그 요청 전체는 Explore 에서 `{service=~"backend_.+"} | json | req_id="01J..."`
+
+우측 상단 **Open in Explore** 를 누르면 클릭으로 만든 조건이 LogQL 로 변환돼 넘어갑니다.
+Drilldown 으로 찾고 → Explore 에서 다듬고 → 대시보드 패널로 굳히는 순서가 자연스럽습니다.
+
+### 제약
+
+- **Live tail 이 없습니다.** 실시간 스트리밍은 Explore 의 Live 버튼만 됩니다.
+- **`line_format` 을 못 씁니다.** 한 줄 요약으로 보려면 대시보드나 Explore 를 쓰세요.
+- **`level` 필터는 backend 에만** 나옵니다. nginx·redis 는 평문이라 JSON 파싱을 하지 않습니다.
+- **blue/green 을 한 번에 못 봅니다.** 서비스를 하나씩 고르는 구조라 `{service=~"backend_.+"}`
+  같은 통합 뷰가 없습니다. 배포 중 두 색을 같이 봐야 하면 Explore 로 가세요.
+- **Patterns 탭은 `loki-config.yml` 의 `pattern_ingester.enabled` 가 켜져 있어야** 채워집니다.
+  켠 시점 이후 로그부터 잡히므로, 방금 켰다면 한동안 비어 보이는 게 정상입니다.
+
 ## 라벨
 
 의도적으로 최소한만 둡니다.

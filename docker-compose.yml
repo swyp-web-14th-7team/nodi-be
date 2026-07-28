@@ -100,6 +100,9 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
+      # Logs Drilldown (좌측 nav 의 Drilldown → Logs). 기동 시 grafana.com 에서 받아오므로
+      # 서버 egress 가 막혀 있으면 에러 없이 메뉴만 안 뜬다. 그때는 컨테이너 로그를 확인할 것.
+      GF_INSTALL_PLUGINS: grafana-lokiexplore-app
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       # 대시보드 JSON. provisioning/dashboards/dashboards.yml 이 이 경로를 읽음.
