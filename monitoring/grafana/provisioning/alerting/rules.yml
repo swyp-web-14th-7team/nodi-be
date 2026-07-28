@@ -1,0 +1,127 @@
+# Grafana 알림 규칙. UI 에서 만들면 grafana-data 볼륨(sqlite)에만 남아 코드에 안 남으므로
+# 데이터소스·대시보드와 동일하게 프로비저닝으로 관리한다.
+#
+# ★ 규칙만으로는 알림이 가지 않는다. 받을 곳(Contact point)을 한 번 등록해야 한다.
+#   Slack/Discord 웹훅 URL 은 비밀이라 이 파일에 넣지 않았다. monitoring/README.md 참고.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: nodi-be
+    folder: nodi-be
+    # 1분마다 평가
+    interval: 1m
+    rules:
+      # ── 백엔드 에러 ────────────────────────────────────────
+      # level="error" 는 라벨이라 인덱스에서 바로 걸러져 평가가 가볍다.
+      # logger.module.ts 의 customLogLevel 덕분에 5xx 응답 + 처리되지 않은 예외 +
+      # 명시적 logger.error() 가 모두 여기 잡힌다.
+      - uid: nodi-backend-error
+        title: 백엔드 에러 발생
+        condition: B
+        # 로그가 한 줄도 없으면 쿼리 결과가 0 이 아니라 NoData 다.
+        # 트래픽 없는 새벽에 계속 울리지 않도록 OK 로 처리한다.
+        noDataState: OK
+        execErrState: Error
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: '최근 5분간 백엔드 에러 로그 {{ $values.A }}건'
+          runbook: 'Grafana → Drilldown → Logs → backend → level=error'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              datasource:
+                type: loki
+                uid: loki
+              editorMode: code
+              queryType: instant
+              expr: 'sum(count_over_time({service=~"backend_.+", level="error"}[5m]))'
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                    params: []
+                  type: query
+
+      # ── nginx 5xx ─────────────────────────────────────────
+      # 백엔드에 도달하지 못한 요청(배포 중 502/504, upstream 연결 실패)은
+      # 백엔드 로그에 아예 남지 않아 위 규칙으로는 절대 안 잡힌다.
+      # nginx 로그가 JSON 이어야 status 필드를 거를 수 있다 (nginx/conf.d/default.conf).
+      - uid: nodi-nginx-5xx
+        title: nginx 5xx (백엔드 미도달)
+        condition: B
+        noDataState: OK
+        execErrState: Error
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: '최근 5분간 nginx 5xx {{ $values.A }}건 — 배포 중이거나 upstream 이 죽었을 수 있음'
+          runbook: 'docker compose logs nginx | tail -50'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              datasource:
+                type: loki
+                uid: loki
+              editorMode: code
+              queryType: instant
+              expr: 'sum(count_over_time({service="nginx"} | json | status=~"5.." [5m]))'
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                    params: []
+                  type: query

@@ -17,7 +17,11 @@
 | `alloy/config.alloy` | 수집 대상 탐색, 라벨링, pino JSON 파싱 |
 | `loki/loki-config.yml` | 저장소·보존 기간 |
 | `grafana/provisioning/datasources/loki.yml` | Loki 데이터소스 자동 등록 |
+| `grafana/provisioning/alerting/rules.yml` | 알림 규칙 (백엔드 에러, nginx 5xx) |
 | `grafana/dashboards/nodi-be-logs.json` | UI에서 편집할 수 있는 초기 샘플 대시보드 |
+
+로그를 남기는 쪽 설정은 이 디렉터리 밖에 있습니다. `src/lib/logger/logger.module.ts`(pino 출력
+형식·레벨), `nginx/conf.d/default.conf`(nginx JSON 로그 포맷) 두 곳입니다.
 
 샘플 대시보드는 Grafana 기동 시 자동 등록되며, 이후에는 **Dashboards → nodi-be 로그**에서
 패널·쿼리·배치를 수정하고 저장하면 됩니다. UI에서 저장한 내용은 `grafana-data` 볼륨에
@@ -119,6 +123,44 @@ docker compose restart alloy
 그래서 라벨이 아니라 본문에 두고 `| json` 으로 파싱해 검색합니다. nginx 가 `X-Request-Id` 를
 발급해 백엔드로 넘기므로, 같은 요청은 replica 가 달라도 같은 ID 로 묶입니다.
 
+nginx 로그도 같은 ID 를 남기므로 서비스를 가리지 않고 한 번에 볼 수 있습니다.
+
+```logql
+{service=~"backend_.+|nginx"} | json | req_id="01J..."
+```
+
+**502·504 는 백엔드에 줄이 아예 없습니다.** 요청이 백엔드에 닿지 못했기 때문입니다.
+그런 요청은 위 쿼리에서 nginx 줄만 나오는데, 그게 정상이고 그 자체가 단서입니다.
+
+### nginx 로그 (백엔드가 못 보는 것)
+
+```logql
+{service="nginx"} | json | status=~"5.."
+```
+```logql
+{service="nginx"} | json | target="backend_green:3000"
+```
+
+nginx 는 `conf.d/default.conf` 의 `log_format json_log` 로 JSON 을 출력합니다. 주요 필드:
+
+| 필드 | 뜻 |
+| --- | --- |
+| `req_id` | 백엔드 `req_id` 와 같은 값 |
+| `status` | nginx 가 클라이언트에게 최종 응답한 코드 |
+| `target` | 요청을 넘긴 색 (`backend_blue:3000`) — **배포 중 어느 색이 받았는지 확인용** |
+| `upstream_status` | 백엔드가 준 코드. 재시도가 있으면 `502, 200` 처럼 쉼표로 나열됨 |
+| `request_time` / `upstream_time` | 전체 소요 / 백엔드 소요. 차이가 크면 큐잉·재시도 구간 |
+
+`status` 와 `upstream_status` 가 다르면 `proxy_next_upstream` 재시도가 일어난 것입니다.
+
+> nginx **error_log** 는 JSON 으로 못 냅니다. 그래서 `service="nginx"` 스트림에 JSON 과 평문이
+> 섞이고, `| json` 쿼리에서 error_log 줄에는 `__error__="JSONParserErr"` 가 붙습니다.
+> 거슬리면 `| json | __error__=""` 를 덧붙이세요. 반대로 error_log 만 보려면:
+>
+> ```logql
+> {service="nginx"} != "{"
+> ```
+
 ### 한 줄 요약으로 보기 (대시보드와 동일한 표시)
 
 ```logql
@@ -178,7 +220,7 @@ docker compose exec grafana ls /var/lib/grafana/plugins
 | --- | --- |
 | Logs | 로그 줄 목록 |
 | Labels | 라벨 값 분포 → 클릭하면 필터로 붙음 (`level`, `container`) |
-| Fields | pino JSON 필드를 자동 감지 (`res_statusCode`, `req_url`, `responseTime`) |
+| Fields | JSON 필드를 자동 감지 (백엔드 `res_statusCode`·`req_url`, nginx `status`·`target`) |
 | Patterns | 비슷한 로그를 템플릿으로 묶어 보여줌 |
 
 Fields 탭이 이 프로젝트에선 가장 쓸모 있습니다. `| json | res_statusCode="500"` 를 손으로 치는
@@ -199,11 +241,50 @@ Drilldown 으로 찾고 → Explore 에서 다듬고 → 대시보드 패널로 
 
 - **Live tail 이 없습니다.** 실시간 스트리밍은 Explore 의 Live 버튼만 됩니다.
 - **`line_format` 을 못 씁니다.** 한 줄 요약으로 보려면 대시보드나 Explore 를 쓰세요.
-- **`level` 필터는 backend 에만** 나옵니다. nginx·redis 는 평문이라 JSON 파싱을 하지 않습니다.
+- **`level` 필터는 backend 에만** 나옵니다. Alloy 가 backend 에만 JSON 파싱을 겁니다.
+  nginx 는 JSON 이라 Fields 탭은 잘 뜨지만 Labels 탭에 `level` 은 없습니다.
 - **blue/green 을 한 번에 못 봅니다.** 서비스를 하나씩 고르는 구조라 `{service=~"backend_.+"}`
   같은 통합 뷰가 없습니다. 배포 중 두 색을 같이 봐야 하면 Explore 로 가세요.
 - **Patterns 탭은 `loki-config.yml` 의 `pattern_ingester.enabled` 가 켜져 있어야** 채워집니다.
   켠 시점 이후 로그부터 잡히므로, 방금 켰다면 한동안 비어 보이는 게 정상입니다.
+
+## 알림
+
+대시보드·Drilldown·Explore 는 **사람이 봐야** 알 수 있습니다. 새벽에 500 이 쏟아져도 아침에
+열어봐야 압니다. 그 공백을 메우는 게 알림입니다.
+
+규칙은 `grafana/provisioning/alerting/rules.yml` 에 코드로 관리합니다 (UI 에서 만들면
+`grafana-data` 볼륨에만 남습니다). 두 개가 등록돼 있습니다.
+
+| 규칙 | 조건 | 왜 필요한가 |
+| --- | --- | --- |
+| 백엔드 에러 발생 | 5분간 `level="error"` 1건 이상 | 5xx 응답 + 처리되지 않은 예외 + 명시적 `logger.error()` |
+| nginx 5xx (백엔드 미도달) | 5분간 nginx `status=~"5.."` 1건 이상 | 배포 중 502/504 는 **백엔드 로그에 아예 안 남아** 위 규칙으로 못 잡음 |
+
+### 받을 곳 등록 (최초 1회, 필수)
+
+**규칙만으로는 알림이 가지 않습니다.** 웹훅 URL 은 비밀이라 프로비저닝 파일에 넣지 않았으므로
+UI 에서 한 번 등록해야 합니다.
+
+1. **Alerting → Contact points → Add contact point**
+2. Integration 에서 Slack/Discord/Webhook 을 고르고 웹훅 URL 입력 → **Test** 로 확인 후 저장
+3. **Alerting → Notification policies → Default policy** 편집 → 방금 만든 contact point 선택
+
+등록 상태는 **Alerting → Alert rules** 에서 규칙이 `Normal` 로 보이는지로 확인합니다.
+`Error` 면 쿼리가 잘못된 것이고, 아무것도 없으면 프로비저닝 파일을 못 읽은 것입니다.
+
+```bash
+docker compose logs grafana | grep -i "alerting\|provision"
+```
+
+### 왜 "로그가 끊기면 알림" 은 없나
+
+백엔드는 요청이 있을 때만 로그를 남깁니다(`/health` 는 `autoLogging.ignore` 로 제외).
+트래픽 없는 새벽에는 정상이어도 로그가 0 이라, 그런 규칙을 넣으면 매일 밤 오탐이 납니다.
+서비스가 살아 있는지 보려면 로그가 아니라 별도의 헬스체크·업타임 모니터가 맞습니다.
+
+같은 이유로 두 규칙 모두 `noDataState: OK` 입니다. 로그가 한 줄도 없을 때 Loki 는 `0` 이
+아니라 **NoData** 를 반환하는데, 이걸 `Alerting` 으로 두면 조용한 새벽마다 울립니다.
 
 ## 라벨
 
@@ -213,10 +294,15 @@ Drilldown 으로 찾고 → Explore 에서 다듬고 → 대시보드 패널로 
 | --- | --- |
 | `service` | `backend_blue`, `backend_green`, `nginx`, `redis` |
 | `container` | `nodi-be-backend_blue-1` (replica 구분) |
-| `level` | `info`, `error` (백엔드만) |
+| `level` | `info`, `warn`, `error` (백엔드만) |
 | `service_name` | `service` 와 값이 같음 |
 
-`level` 은 백엔드 컨테이너에만 붙습니다. nginx·redis 는 평문 로그라 JSON 파싱을 하지 않습니다.
+`level` 은 백엔드 컨테이너에만 붙습니다. Alloy 의 `stage.match` 가 `backend_.+` 에만 JSON
+파싱을 걸기 때문입니다 (redis 는 평문, nginx 는 JSON 이지만 level 개념이 없음).
+
+레벨은 `logger.module.ts` 의 `customLogLevel` 이 정합니다. **5xx → `error`, 4xx → `warn`,
+나머지 → `info`.** pino-http 는 기본적으로 5xx 도 `info` 로 남기기 때문에 이 설정이 없으면
+`level="error"` 로 500 을 찾을 수 없습니다. 지우지 마세요.
 
 `service_name` 은 우리가 만든 게 아니라 Loki 3 가 `service` 를 보고 자동으로 붙이는 라벨입니다.
 Grafana 의 Logs UI 가 이 이름을 사용해서 그대로 뒀습니다. 값이 같으니 `service` 를 쓰면 됩니다.
