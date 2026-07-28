@@ -82,7 +82,9 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:11.6.1
+    # ★ 11.6.11 미만으로 내리지 말 것: Logs Drilldown 플러그인이 >=11.6.11 을 요구해서
+    #   그보다 낮으면 플러그인을 받아도 로드되지 않고 "App not found" 만 뜬다.
+    image: grafana/grafana:11.6.16
     container_name: be-grafana
     ports: ["3000:3000"]
     # 다른 서비스와 동일하게 .env.deploy 로 환경변수를 관리.

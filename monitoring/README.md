@@ -153,13 +153,20 @@ sum(rate({service=~"backend_.+", level="error"}[1m]))
 먼저 보여주고 클릭으로 좁혀 들어가는 UI 입니다. **어디가 문제인지 모를 때** 쓰고, 볼 것이 정해져
 있으면 위의 LogQL 을 붙여넣는 편이 빠릅니다.
 
-메뉴에 **Drilldown 이 없으면** 플러그인이 안 받아진 것입니다. `docker-compose.yml` 의
-`GF_INSTALL_PLUGINS: grafana-lokiexplore-app` 를 기동 시 grafana.com 에서 내려받는 구조라,
-서버 egress 가 막혀 있으면 **에러 없이 메뉴만 안 뜹니다**.
+메뉴에 **Drilldown 이 없거나 "App not found" 가 뜨면** 원인은 둘 중 하나입니다.
+
+1. **Grafana 버전 미달.** 플러그인이 `>=11.6.11` 을 요구합니다. 그보다 낮으면 플러그인을
+   받아놓고도 로드하지 않습니다. `docker-compose.yml` 의 이미지 태그를 내리지 마세요.
+2. **다운로드 실패.** `GF_INSTALL_PLUGINS: grafana-lokiexplore-app` 는 기동 시 grafana.com 에서
+   받아오는 구조라, 서버 egress 가 막혀 있으면 **에러 없이 메뉴만 안 뜹니다.**
 
 ```bash
-docker compose logs grafana | grep -i plugin
+docker compose logs grafana | grep -iE "lokiexplore|plugin"
+docker compose exec grafana ls /var/lib/grafana/plugins
 ```
+
+`GF_INSTALL_PLUGINS` 는 컨테이너가 새로 만들어질 때만 적용됩니다. `restart` 가 아니라
+`up -d` 로 재생성해야 합니다.
 
 진입 화면의 서비스 목록은 `service_name` 라벨 값입니다. 아래 [라벨](#라벨) 절에서 "Loki 3 가
 자동으로 붙여서 그대로 뒀다" 고 한 그 라벨이 여기서 쓰입니다. 그래서 추가 설정 없이
