@@ -16,6 +16,14 @@ const isProd = process.env.NODE_ENV === 'prod';
       pinoHttp: {
         level: isProd ? 'info' : 'debug',
         transport: isProd ? undefined : { target: 'pino-pretty' },
+        // pino-http 는 기본적으로 모든 완료 요청을 info 로 남긴다. 5xx 분기가 있지만
+        // 그건 로그 객체 모양만 바꾸고 레벨은 그대로라, 이 설정이 없으면 500 응답도
+        // level="info" 로 남아 Loki 의 level="error" 필터와 알림에 걸리지 않는다.
+        customLogLevel: (_req, res, err) => {
+          if (err || res.statusCode >= 500) return 'error';
+          if (res.statusCode >= 400) return 'warn';
+          return 'info';
+        },
         // 헬스체크(/health)는 Docker HEALTHCHECK 가 10초마다 호출해 로그를 뒤덮으므로 제외.
         // ignore 가 true 면 자동 요청/응답 로그를 남기지 않음. url 은 쿼리스트링이 붙을 수
         // 있어 '?' 앞부분만 비교.
