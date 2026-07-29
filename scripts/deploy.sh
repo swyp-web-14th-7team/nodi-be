@@ -41,6 +41,62 @@ err()  { printf '\033[1;31m[deploy:error]\033[0m %s\n' "$*" >&2; }
 # 색 → compose profile 인자 (blue 는 profile 없음, green 만 "green")
 profile_args() { [ "$1" = "green" ] && printf -- '--profile green' || printf ''; }
 
+# 지정한 backend 서비스의 모든 replica가 healthy가 될 때까지 기다린다.
+wait_for_health() {
+  local service="$1"
+  local profile="$2"
+  local elapsed=0
+
+  log "$service 헬스체크 대기 (최대 ${HEALTH_TIMEOUT}s, replica 전체 healthy 필요)..."
+  while :; do
+    # shellcheck disable=SC2086
+    ids=$(docker compose $profile ps -q "$service")
+    total=0; healthy=0
+    for id in $ids; do
+      total=$((total + 1))
+      status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id" 2>/dev/null || echo none)
+      [ "$status" = "healthy" ] && healthy=$((healthy + 1))
+    done
+    log "  healthy ${healthy}/${total:-0}"
+
+    if [ "$total" -gt 0 ] && [ "$healthy" -eq "$total" ]; then
+      log "✅ $service 전체 healthy"
+      return 0
+    fi
+
+    if [ "$elapsed" -ge "$HEALTH_TIMEOUT" ]; then
+      err "$service 헬스체크 실패"
+      return 1
+    fi
+    sleep "$POLL_INTERVAL"
+    elapsed=$((elapsed + POLL_INTERVAL))
+  done
+}
+
+# ── 0) 최초 기동 ───────────────────────────────────────────────
+# nginx가 실행 중이 아니면 아직 compose stack이 준비되지 않은 것으로 보고 전체를 blue로 기동한다.
+if [ -z "$(docker compose ps -q "$NGINX_SVC")" ]; then
+  log "실행 중인 nginx가 없음 → 최초 compose 기동"
+  mkdir -p "$(dirname "$ACTIVE_FILE")"
+  printf 'set $upstream backend_blue:3000;\n' > "$ACTIVE_FILE"
+
+  docker compose up -d
+
+  if ! wait_for_health "backend_blue" ""; then
+    err "최초 기동 실패"
+    exit 1
+  fi
+
+  log "최초 기동 스모크 테스트 (http://localhost:8080/health)..."
+  if ! curl -fsS -m 5 http://localhost:8080/health > /dev/null; then
+    err "최초 기동 스모크 테스트 실패"
+    exit 1
+  fi
+
+  log "🎉 최초 compose 기동 성공: blue 활성"
+  exit 0
+fi
+
 # ── 1) 현재 활성 색 파악 ──────────────────────────────────────
 if [ ! -f "$ACTIVE_FILE" ]; then
   err "$ACTIVE_FILE 가 없습니다. 먼저 'set \$upstream backend_blue:3000;' 로 생성하세요."
@@ -66,33 +122,12 @@ log "$NEXT_SVC 기동..."
 docker compose $NEXT_PROFILE up -d "$NEXT_SVC"
 
 # ── 3) 새 색 헬스체크 (전환 전!) ──────────────────────────────
-log "$NEXT_SVC 헬스체크 대기 (최대 ${HEALTH_TIMEOUT}s, replica 전체 healthy 필요)..."
-elapsed=0
-while :; do
+if ! wait_for_health "$NEXT_SVC" "$NEXT_PROFILE"; then
+  err "$NEXT_SVC 헬스체크 실패 → 배포 취소 (현재 색 $CURRENT 무사)"
   # shellcheck disable=SC2086
-  ids=$(docker compose $NEXT_PROFILE ps -q "$NEXT_SVC")
-  total=0; healthy=0
-  for id in $ids; do
-    total=$((total + 1))
-    status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id" 2>/dev/null || echo none)
-    [ "$status" = "healthy" ] && healthy=$((healthy + 1))
-  done
-  log "  healthy ${healthy}/${total:-0}"
-
-  if [ "$total" -gt 0 ] && [ "$healthy" -eq "$total" ]; then
-    log "✅ $NEXT_SVC 전체 healthy"
-    break
-  fi
-
-  if [ "$elapsed" -ge "$HEALTH_TIMEOUT" ]; then
-    err "$NEXT_SVC 헬스체크 실패 → 배포 취소 (현재 색 $CURRENT 무사)"
-    # shellcheck disable=SC2086
-    docker compose $NEXT_PROFILE rm -sf "$NEXT_SVC" || true
-    exit 1
-  fi
-  sleep "$POLL_INTERVAL"
-  elapsed=$((elapsed + POLL_INTERVAL))
-done
+  docker compose $NEXT_PROFILE rm -sf "$NEXT_SVC" || true
+  exit 1
+fi
 
 # ── 4) upstream 전환 ──────────────────────────────────────────
 log "upstream → $NEXT_SVC 로 전환"
