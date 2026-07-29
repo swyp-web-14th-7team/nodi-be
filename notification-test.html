@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>nodi SSE 알림 테스트</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0d12;
+        --panel: #121620;
+        --panel-2: #191f2b;
+        --line: #293142;
+        --text: #eef2f8;
+        --muted: #8d98aa;
+        --blue: #6aa8ff;
+        --green: #58d68d;
+        --yellow: #f5c451;
+        --red: #ff6b75;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 12% 0%, #14233c 0, transparent 28rem),
+          var(--bg);
+        color: var(--text);
+        font-family:
+          Inter,
+          Pretendard,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 42px auto 80px;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(26px, 5vw, 40px);
+        letter-spacing: -0.04em;
+      }
+      h2 {
+        margin: 0 0 18px;
+        font-size: 17px;
+      }
+      p {
+        color: var(--muted);
+        line-height: 1.65;
+      }
+      code {
+        color: #b8d3ff;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: end;
+        margin-bottom: 28px;
+      }
+      .header p {
+        margin: 8px 0 0;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .wide {
+        grid-column: 1 / -1;
+      }
+      .card {
+        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 18px 60px rgb(0 0 0 / 0.18);
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .field.full {
+        grid-column: 1 / -1;
+      }
+      label {
+        display: block;
+        margin: 0 0 7px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      input,
+      select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--panel-2);
+        color: var(--text);
+        padding: 11px 12px;
+        outline: none;
+      }
+      input:focus,
+      select:focus {
+        border-color: var(--blue);
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        margin-top: 16px;
+      }
+      button {
+        border: 0;
+        border-radius: 9px;
+        padding: 10px 14px;
+        cursor: pointer;
+        color: #08101e;
+        background: var(--blue);
+        font-weight: 800;
+      }
+      button.secondary {
+        color: var(--text);
+        background: #283143;
+      }
+      button.danger {
+        color: white;
+        background: #9b3842;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--muted);
+        box-shadow: 0 0 0 4px rgb(141 152 170 / 0.12);
+      }
+      .status.connecting .dot {
+        background: var(--yellow);
+      }
+      .status.open .dot {
+        background: var(--green);
+        box-shadow: 0 0 0 4px rgb(88 214 141 / 0.13);
+      }
+      .status.error .dot {
+        background: var(--red);
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .metric {
+        padding: 12px;
+        border-radius: 10px;
+        background: var(--panel-2);
+      }
+      .metric b {
+        display: block;
+        font-size: 21px;
+        margin-top: 3px;
+      }
+      .metric span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .notifications {
+        display: grid;
+        gap: 10px;
+        max-height: 410px;
+        overflow: auto;
+      }
+      .notification {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+        background: var(--panel-2);
+      }
+      .notification.accepted {
+        border-left: 3px solid var(--green);
+      }
+      .notification.rejected {
+        border-left: 3px solid var(--red);
+      }
+      .notification-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .notification p {
+        margin: 8px 0 0;
+      }
+      .notification small {
+        color: var(--muted);
+      }
+      pre {
+        min-height: 240px;
+        max-height: 410px;
+        overflow: auto;
+        margin: 0;
+        padding: 15px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #080a0f;
+        color: #bec8d8;
+        font:
+          12px/1.6 ui-monospace,
+          Consolas,
+          monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .hint {
+        margin: 14px 0 0;
+        padding: 11px 13px;
+        border-radius: 9px;
+        background: #171d29;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .toast-stack {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        display: grid;
+        gap: 9px;
+        z-index: 10;
+      }
+      .toast {
+        width: min(380px, calc(100vw - 36px));
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #202837;
+        box-shadow: 0 16px 45px #0009;
+        animation: enter 0.2s ease-out;
+      }
+      @keyframes enter {
+        from {
+          transform: translateY(8px);
+          opacity: 0;
+        }
+      }
+      @media (max-width: 760px) {
+        .grid,
+        .fields {
+          grid-template-columns: 1fr;
+        }
+        .wide,
+        .field.full {
+          grid-column: auto;
+        }
+        .metrics {
+          grid-template-columns: 1fr 1fr;
+        }
+        .header {
+          align-items: start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="header">
+        <div>
+          <h1>SSE 알림 테스트</h1>
+          <p>
+            연결, heartbeat, 수락·거절 알림과 재연결 동작을 한 화면에서
+            확인합니다.
+          </p>
+        </div>
+        <div id="status" class="status">
+          <span class="dot"></span><span>연결 안 됨</span>
+        </div>
+      </div>
+
+      <div class="grid">
+        <section class="card wide">
+          <h2>1. 수신 스트림</h2>
+          <div class="fields">
+            <div class="field">
+              <label for="apiBase">API Base</label>
+              <input id="apiBase" value="http://localhost:3000" />
+            </div>
+            <div class="field">
+              <label for="streamPath">Stream path</label>
+              <input id="streamPath" value="/notifications/stream" />
+            </div>
+            <div class="field">
+              <label for="mode">연결 방식</label>
+              <select id="mode">
+                <option value="fetch">
+                  fetch stream + Bearer (현재 서버용)
+                </option>
+                <option value="eventsource">
+                  EventSource + cookie (설계 문서용)
+                </option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="receiverToken">수신자 Access Token</label>
+              <input
+                id="receiverToken"
+                type="password"
+                autocomplete="off"
+                placeholder="fetch stream 모드에서 사용"
+              />
+            </div>
+          </div>
+          <div class="actions">
+            <button id="connect">연결</button>
+            <button id="disconnect" class="danger" disabled>연결 끊기</button>
+            <button id="clear" class="secondary">결과 초기화</button>
+          </div>
+          <div class="metrics">
+            <div class="metric">
+              <span>알림</span><b id="notificationCount">0</b>
+            </div>
+            <div class="metric"><span>Ping</span><b id="pingCount">0</b></div>
+            <div class="metric">
+              <span>재연결</span><b id="reconnectCount">0</b>
+            </div>
+            <div class="metric">
+              <span>마지막 이벤트</span><b id="lastEvent">-</b>
+            </div>
+          </div>
+          <div id="modeHint" class="hint"></div>
+        </section>
+
+        <section class="card wide">
+          <h2>2. 알림 발생시키기</h2>
+          <div class="fields">
+            <div class="field">
+              <label for="actorBase"
+                >처리 서버 Base (교차 인스턴스 테스트 시 3002)</label
+              >
+              <input id="actorBase" value="http://localhost:3000" />
+            </div>
+            <div class="field">
+              <label for="requestId">Connection Request ID</label>
+              <input id="requestId" placeholder="수신자가 보낸 요청의 ID" />
+            </div>
+            <div class="field full">
+              <label for="actorToken"
+                >요청을 받은 사용자(B)의 Access Token</label
+              >
+              <input id="actorToken" type="password" autocomplete="off" />
+            </div>
+          </div>
+          <div class="actions">
+            <button id="accept">수락 요청</button>
+            <button id="reject" class="danger">거절 요청</button>
+          </div>
+          <p class="hint">
+            수신 스트림은 요청자 A로 연결하고, 여기에는 요청을 처리하는 B의
+            토큰을 입력하세요. 3001로 스트림을 열고 3002에서 처리하면 Redis 교차
+            인스턴스 전달을 검증할 수 있습니다.
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>수신 알림</h2>
+          <div id="notifications" class="notifications">
+            <p id="empty">아직 수신한 알림이 없습니다.</p>
+          </div>
+        </section>
+        <section class="card">
+          <h2>이벤트 로그</h2>
+          <pre id="log">대기 중…</pre>
+        </section>
+      </div>
+    </main>
+    <div id="toasts" class="toast-stack" aria-live="polite"></div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const state = {
+        controller: null,
+        eventSource: null,
+        notificationCount: 0,
+        pingCount: 0,
+        reconnectCount: 0,
+        openedOnce: false,
+      };
+
+      const base = (id) => $(id).value.trim().replace(/\/+$/, '');
+      const streamUrl = () =>
+        `${base('apiBase')}/${$('streamPath').value.trim().replace(/^\/+/, '')}`;
+      const stamp = () =>
+        new Date().toLocaleTimeString('ko-KR', { hour12: false });
+
+      function log(message, value) {
+        const details =
+          value === undefined
+            ? ''
+            : `\n${typeof value === 'string' ? value : JSON.stringify(value, null, 2)}`;
+        $('log').textContent =
+          `[${stamp()}] ${message}${details}\n\n${$('log').textContent === '대기 중…' ? '' : $('log').textContent}`;
+      }
+
+      function setStatus(kind, text) {
+        $('status').className = `status ${kind || ''}`;
+        $('status').lastElementChild.textContent = text;
+      }
+
+      function setConnected(connected) {
+        $('connect').disabled = connected;
+        $('disconnect').disabled = !connected;
+      }
+
+      function updateMetric(id, value) {
+        $(id).textContent = String(value);
+      }
+      function markEvent() {
+        updateMetric('lastEvent', stamp());
+      }
+
+      function unwrapNotification(raw) {
+        let value = raw;
+        for (let i = 0; i < 2 && typeof value === 'string'; i += 1) {
+          try {
+            value = JSON.parse(value);
+          } catch {
+            break;
+          }
+        }
+        return value;
+      }
+
+      function payloadOf(noti) {
+        const first = noti?.payload ?? noti ?? {};
+        return first?.payload ?? first;
+      }
+
+      function describe(noti) {
+        const payload = payloadOf(noti);
+        const name = payload.counterpartName || '상대방';
+        if (noti?.type === 1)
+          return {
+            title: '연결 요청이 수락되었습니다',
+            body: `${name}님과 연결되었습니다.`,
+            className: 'accepted',
+          };
+        if (noti?.type === 2)
+          return {
+            title: '연결 요청이 거절되었습니다',
+            body: `${name}님이 연결 요청을 거절했습니다.`,
+            className: 'rejected',
+          };
+        return {
+          title: `알 수 없는 알림 타입 ${noti?.type ?? '-'}`,
+          body: JSON.stringify(payload),
+          className: '',
+        };
+      }
+
+      function toast(title, body) {
+        const el = document.createElement('div');
+        el.className = 'toast';
+        const strong = document.createElement('strong');
+        const p = document.createElement('p');
+        strong.textContent = title;
+        p.textContent = body;
+        p.style.margin = '5px 0 0';
+        el.append(strong, p);
+        $('toasts').append(el);
+        setTimeout(() => el.remove(), 5000);
+      }
+
+      function onNotification(raw, eventId) {
+        const noti = unwrapNotification(raw);
+        const desc = describe(noti);
+        state.notificationCount += 1;
+        updateMetric('notificationCount', state.notificationCount);
+        markEvent();
+        $('empty')?.remove();
+
+        const item = document.createElement('article');
+        item.className = `notification ${desc.className}`;
+        const head = document.createElement('div');
+        head.className = 'notification-head';
+        const strong = document.createElement('strong');
+        const small = document.createElement('small');
+        const body = document.createElement('p');
+        strong.textContent = desc.title;
+        small.textContent = new Date(
+          noti?.createdAt || Date.now(),
+        ).toLocaleString();
+        body.textContent = desc.body;
+        head.append(strong, small);
+        item.append(head, body);
+        $('notifications').prepend(item);
+        toast(desc.title, desc.body);
+        log(`notification 수신${eventId ? ` (id: ${eventId})` : ''}`, noti);
+      }
+
+      function onPing() {
+        state.pingCount += 1;
+        updateMetric('pingCount', state.pingCount);
+        markEvent();
+        log('ping 수신');
+      }
+
+      function dispatchSse(event) {
+        if (event.event === 'notification')
+          onNotification(event.data, event.id);
+        else if (event.event === 'ping') onPing();
+        else log(`기타 SSE 이벤트: ${event.event || 'message'}`, event.data);
+      }
+
+      function parseBlock(block) {
+        const event = { event: 'message', data: '', id: '' };
+        const data = [];
+        for (const line of block.split(/\r?\n/)) {
+          if (!line || line.startsWith(':')) continue;
+          const colon = line.indexOf(':');
+          const field = colon < 0 ? line : line.slice(0, colon);
+          const value =
+            colon < 0 ? '' : line.slice(colon + 1).replace(/^ /, '');
+          if (field === 'event') event.event = value;
+          else if (field === 'data') data.push(value);
+          else if (field === 'id') event.id = value;
+        }
+        event.data = data.join('\n');
+        if (data.length || event.event !== 'message') dispatchSse(event);
+      }
+
+      async function connectFetch() {
+        const token = $('receiverToken').value.trim();
+        if (!token)
+          throw new Error(
+            'fetch stream 모드에는 수신자 Access Token이 필요합니다.',
+          );
+        state.controller = new AbortController();
+        const response = await fetch(streamUrl(), {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'text/event-stream',
+          },
+          credentials: 'include',
+          cache: 'no-store',
+          signal: state.controller.signal,
+        });
+        if (!response.ok)
+          throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        if (!response.body)
+          throw new Error('ReadableStream을 지원하지 않는 브라우저입니다.');
+        setStatus('open', '연결됨 · fetch stream');
+        log(
+          `스트림 연결 성공 (${response.status}, ${response.headers.get('content-type') || 'content-type 없음'})`,
+        );
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const blocks = buffer.split(/\r?\n\r?\n/);
+          buffer = blocks.pop() || '';
+          blocks.forEach(parseBlock);
+        }
+        if (!state.controller?.signal.aborted)
+          throw new Error('서버가 스트림을 종료했습니다.');
+      }
+
+      function connectEventSource() {
+        return new Promise((resolve) => {
+          const es = new EventSource(streamUrl(), { withCredentials: true });
+          state.eventSource = es;
+          es.onopen = () => {
+            if (state.openedOnce) {
+              state.reconnectCount += 1;
+              updateMetric('reconnectCount', state.reconnectCount);
+            }
+            state.openedOnce = true;
+            setStatus('open', '연결됨 · EventSource');
+            log('EventSource 연결 성공');
+          };
+          es.addEventListener('notification', (event) =>
+            onNotification(event.data, event.lastEventId),
+          );
+          es.addEventListener('ping', onPing);
+          es.onmessage = (event) => log('기본 message 이벤트 수신', event.data);
+          es.onerror = () => {
+            const name =
+              es.readyState === EventSource.CLOSED
+                ? '종료됨'
+                : '오류 · 자동 재연결 대기';
+            setStatus('error', name);
+            log(`EventSource 오류 (readyState=${es.readyState})`);
+          };
+          resolve();
+        });
+      }
+
+      function disconnect(manual = true) {
+        state.controller?.abort();
+        state.eventSource?.close();
+        state.controller = null;
+        state.eventSource = null;
+        setConnected(false);
+        setStatus('', '연결 안 됨');
+        if (manual) log('사용자가 연결을 종료했습니다.');
+      }
+
+      $('connect').onclick = async () => {
+        disconnect(false);
+        state.openedOnce = false;
+        setConnected(true);
+        setStatus('connecting', '연결 중…');
+        log(`연결 시도: ${streamUrl()}`);
+        try {
+          if ($('mode').value === 'eventsource') await connectEventSource();
+          else await connectFetch();
+        } catch (error) {
+          if (error.name !== 'AbortError') {
+            setStatus('error', '연결 실패');
+            log('연결 실패', error.message);
+          }
+          disconnect(false);
+        }
+      };
+
+      $('disconnect').onclick = () => disconnect(true);
+      $('clear').onclick = () => {
+        state.notificationCount = 0;
+        state.pingCount = 0;
+        state.reconnectCount = 0;
+        ['notificationCount', 'pingCount', 'reconnectCount'].forEach((id) =>
+          updateMetric(id, 0),
+        );
+        updateMetric('lastEvent', '-');
+        $('notifications').innerHTML =
+          '<p id="empty">아직 수신한 알림이 없습니다.</p>';
+        $('log').textContent = '대기 중…';
+      };
+
+      async function act(action) {
+        const requestId = $('requestId').value.trim();
+        const token = $('actorToken').value.trim();
+        if (!requestId || !token) {
+          log(
+            '요청 실패',
+            'Connection Request ID와 B의 Access Token을 모두 입력하세요.',
+          );
+          return;
+        }
+        const url = `${base('actorBase')}/connection-requests/${encodeURIComponent(requestId)}/${action}`;
+        try {
+          const response = await fetch(url, {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: 'include',
+          });
+          const body = await response.text();
+          let parsed = body;
+          try {
+            parsed = body ? JSON.parse(body) : null;
+          } catch {
+            /* 원문 유지 */
+          }
+          log(`PATCH ${action} → ${response.status}`, parsed);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        } catch (error) {
+          log(`${action} 처리 실패`, error.message);
+        }
+      }
+
+      $('accept').onclick = () => act('accept');
+      $('reject').onclick = () => act('reject');
+
+      function updateModeHint() {
+        const isFetch = $('mode').value === 'fetch';
+        $('receiverToken').disabled = !isFetch;
+        $('modeHint').innerHTML = isFetch
+          ? '<strong>현재 코드와 호환:</strong> AuthGuard가 Bearer 헤더를 요구하므로 fetch로 SSE 바이트 스트림을 직접 읽습니다.'
+          : '<strong>설계 문서 검증:</strong> 네이티브 EventSource는 Authorization 헤더를 보낼 수 없습니다. 서버가 쿠키 인증을 지원할 때만 성공합니다.';
+      }
+
+      $('mode').onchange = updateModeHint;
+      updateModeHint();
+      window.addEventListener('beforeunload', () => disconnect(false));
+    </script>
+  </body>
+</html>

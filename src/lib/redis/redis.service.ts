@@ -2,6 +2,7 @@ import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { buildRedisOptions, getRedisUrl } from '@/lib/redis/redis.config';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy, OnModuleInit {
@@ -9,22 +10,11 @@ export class RedisService implements OnModuleDestroy, OnModuleInit {
   private readonly redisUrl: string;
 
   constructor(
-    private readonly configService: ConfigService,
+    configService: ConfigService,
     @InjectPinoLogger(RedisService.name) private readonly logger: PinoLogger,
   ) {
-    const host = configService.get<string>('REDIS_HOST') ?? 'localhost';
-    const port = configService.get<number>('REDIS_PORT') ?? 6379;
-    const username = configService.get<string>('REDIS_USERNAME') ?? '';
-    const password = configService.get<string>('REDIS_PASSWORD') ?? '';
-
-    this.client = new Redis({
-      host,
-      port,
-      username,
-      password,
-      lazyConnect: true,
-    });
-    this.redisUrl = `${host}:${port}`;
+    this.client = new Redis(buildRedisOptions(configService));
+    this.redisUrl = getRedisUrl(configService);
 
     this.client.on('error', (err) => {
       this.logger.error(`RedisClient error: ${err.message}`);

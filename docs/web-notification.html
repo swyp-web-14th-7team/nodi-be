@@ -1,0 +1,1996 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nodi 실시간 알림 설계 문서</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1c1e21;
+    --muted: #5c6470;
+    --line: #e3e6ea;
+    --code-bg: #f6f7f9;
+    --accent: #2f6feb;
+    --accent-soft: #eaf1ff;
+    --fe: #7c3aed;
+    --be: #0d9488;
+    --warn-bg: #fff8e6;
+    --warn-line: #e0a800;
+    --table-head: #f6f7f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e4e6eb;
+      --muted: #9aa2ad;
+      --line: #2c3038;
+      --code-bg: #1e2127;
+      --accent: #6ea0ff;
+      --accent-soft: #1d2635;
+      --fe: #b18cff;
+      --be: #3fd0c0;
+      --warn-bg: #2a2416;
+      --warn-line: #b08800;
+      --table-head: #1e2127;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    padding: 40px 24px 120px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo",
+                 "Malgun Gothic", "Segoe UI", sans-serif;
+    line-height: 1.75;
+    font-size: 15px;
+  }
+
+  /* ---------- 레이아웃 ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: 236px minmax(0, 1fr);
+    gap: 56px;
+    max-width: 1220px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  main { min-width: 0; max-width: 880px; }
+
+  /* ---------- 목차 ---------- */
+  .toc {
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    padding-right: 8px;
+    border-right: 1px solid var(--line);
+  }
+  .toc-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--muted); text-transform: uppercase;
+    margin: 0 0 12px; padding-left: 10px;
+  }
+  .toc ul { list-style: none; margin: 0; padding: 0; }
+  .toc li { margin: 0; }
+  .toc a {
+    display: block;
+    padding: 5px 10px;
+    color: var(--muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    border-radius: 0 4px 4px 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .toc a:hover { color: var(--fg); background: var(--code-bg); }
+  .toc > ul > li > a { font-weight: 600; color: var(--fg); margin-top: 6px; }
+  .toc .sub a { padding-left: 22px; font-size: 12.5px; }
+  .toc a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .toc::-webkit-scrollbar { width: 6px; }
+  .toc::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+  @media (max-width: 1040px) {
+    .layout { grid-template-columns: 1fr; gap: 24px; }
+    .toc {
+      position: static; max-height: 240px;
+      border: 1px solid var(--line); border-radius: 8px;
+      padding: 14px 6px; margin-bottom: 16px;
+    }
+  }
+
+  /* ---------- 본문 ---------- */
+  h1 { font-size: 30px; line-height: 1.3; margin: 0 0 8px; letter-spacing: -0.02em; }
+  h2 {
+    font-size: 21px; margin: 56px 0 16px; padding-top: 24px;
+    border-top: 1px solid var(--line); letter-spacing: -0.01em;
+    scroll-margin-top: 24px;
+  }
+  h3 { font-size: 16px; margin: 32px 0 10px; scroll-margin-top: 24px; }
+  h4 {
+    font-size: 14px; margin: 24px 0 8px; color: var(--muted);
+    font-weight: 700; letter-spacing: 0.01em;
+  }
+  p { margin: 12px 0; }
+  ul, ol { padding-left: 22px; margin: 12px 0; }
+  li { margin: 6px 0; }
+  a { color: var(--accent); }
+
+  .subtitle { color: var(--muted); margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+
+  code {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    padding: 2px 5px;
+    border-radius: 4px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    line-height: 1.6;
+  }
+  pre code { background: none; padding: 0; font-size: 13px; }
+
+  .scroll { overflow-x: auto; margin: 16px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 520px; }
+  th, td { border: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--table-head); font-weight: 600; }
+
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 7px; border-radius: 4px; vertical-align: middle;
+  }
+  .tag-fe { color: var(--fe); border: 1px solid var(--fe); }
+  .tag-be { color: var(--be); border: 1px solid var(--be); }
+  .tag-infra { color: var(--muted); border: 1px solid var(--muted); }
+
+  .note {
+    background: var(--warn-bg);
+    border-left: 3px solid var(--warn-line);
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 16px 0;
+  }
+  .note p:first-child { margin-top: 0; }
+  .note p:last-child { margin-bottom: 0; }
+
+  .flow { margin: 20px 0; }
+  .flow-row {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .flow-row:last-child { border-bottom: none; }
+  .flow-no {
+    font-size: 12px; font-weight: 700; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 50%;
+    width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+  .flow-body { min-width: 0; }
+  .flow-lane { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .flow-desc .sub { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  .lane-fe { color: var(--fe); }
+  .lane-be { color: var(--be); }
+  .lane-both { color: var(--muted); }
+
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li { padding-left: 26px; position: relative; }
+  .checklist li::before { content: "☐"; position: absolute; left: 4px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<nav class="toc" aria-label="목차">
+  <p class="toc-title">목차</p>
+  <ul>
+    <li><a href="#overview">1. 개요</a>
+      <ul class="sub">
+        <li><a href="#events">1.1 알림 대상 이벤트</a></li>
+        <li><a href="#tech-choice">1.2 기술 선택</a></li>
+      </ul>
+    </li>
+    <li><a href="#roles">2. 역할 분리</a></li>
+    <li><a href="#flow">3. 연동 흐름</a>
+      <ul class="sub">
+        <li><a href="#flow-main">3.1 수락 → 알림 도달</a></li>
+        <li><a href="#flow-reconnect">3.2 재연결</a></li>
+        <li><a href="#flow-logout">3.3 로그아웃</a></li>
+        <li><a href="#flow-teardown">3.4 커넥션 회수</a></li>
+      </ul>
+    </li>
+    <li><a href="#api">4. API 명세</a>
+      <ul class="sub">
+        <li><a href="#api-payload">4.1 이벤트 페이로드</a></li>
+      </ul>
+    </li>
+    <li><a href="#backend">5. 백엔드 구현</a>
+      <ul class="sub">
+        <li><a href="#be-layout">5.1 모듈 배치</a></li>
+        <li><a href="#be-model">5.2 데이터 모델</a></li>
+        <li><a href="#be-controller">5.3 SSE 컨트롤러</a></li>
+        <li><a href="#be-redis">5.4 Redis Pub/Sub (lib)</a></li>
+        <li><a href="#be-hook">5.5 기존 서비스 연동</a></li>
+        <li><a href="#be-nginx">5.6 nginx 설정</a></li>
+      </ul>
+    </li>
+    <li><a href="#frontend">6. 프론트엔드 구현</a>
+      <ul class="sub">
+        <li><a href="#fe-provider">6.1 Provider</a></li>
+        <li><a href="#fe-placement">6.2 배치 위치</a></li>
+        <li><a href="#fe-vite">6.3 Vite dev 프록시</a></li>
+        <li><a href="#toast">6.4 토스트</a></li>
+        <li><a href="#fe-consume">6.5 소비</a></li>
+        <li><a href="#fe-heartbeat">6.6 heartbeat 처리</a></li>
+      </ul>
+    </li>
+    <li><a href="#local">7. 로컬 개발 · 테스트</a>
+      <ul class="sub">
+        <li><a href="#local-setup">7.1 사전 준비</a></li>
+        <li><a href="#local-levels">7.2 단계별 검증</a></li>
+        <li><a href="#local-gaps">7.3 재현되지 않는 것</a></li>
+      </ul>
+    </li>
+    <li><a href="#observability">8. 운영 관측</a>
+      <ul class="sub">
+        <li><a href="#obs-logging">8.1 sse_stats 로깅 전략</a></li>
+        <li><a href="#obs-panels">8.2 Grafana 패널</a></li>
+        <li><a href="#obs-alert">8.3 알림 규칙</a></li>
+        <li><a href="#obs-prometheus">8.4 Prometheus 미도입 근거</a></li>
+      </ul>
+    </li>
+    <li><a href="#caveats">9. 주의사항</a></li>
+    <li><a href="#future">10. 확장: Web Push</a></li>
+    <li><a href="#checklist">11. 작업 체크리스트</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<h1>nodi 실시간 알림 설계 문서</h1>
+<p class="subtitle">연결 요청 수락 · 거절 알림의 실시간 전달(SSE) 구현 계획 — 프론트엔드 · 백엔드 역할 분리</p>
+<p class="meta">
+  작성일 2026-07-29 ·
+  백엔드 nodi-be (NestJS 11 / Prisma 7 / MariaDB / Redis / nginx, <strong>인스턴스 2대</strong>) ·
+  프론트엔드 Vite + React (JavaScript)
+</p>
+
+<h2 id="overview">1. 개요</h2>
+
+<p>
+사용자가 서비스를 <strong>사용 중일 때</strong> 자신이 보낸 연결 요청의 처리 결과를
+새로고침 없이 즉시 전달한다. 브라우저가 닫힌 상태에서의 전달(Web Push)은
+<a href="#future">10장</a>에서 확장 계획으로만 다룬다.
+</p>
+
+<h3 id="events">1.1 알림 대상 이벤트</h3>
+
+<p>
+현재 범위의 알림은 <strong>두 가지뿐이다.</strong> 두 경우 모두
+<code>CardConnectionRequest</code>의 <strong>요청자</strong>(<code>requesterCard.userId</code>)에게 전달된다.
+수신자(응답한 사람)에게는 알림을 보내지 않는다. 본인이 방금 누른 행동이기 때문이다.
+</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>타입</th><th>발생 지점</th><th>수신자</th><th>토스트</th><th>이동 경로</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>CONNECTION_ACCEPTED</code> (1)</td>
+      <td><code>ConnectionRequestsService.acceptRequest()</code></td>
+      <td>요청자</td>
+      <td>노출</td>
+      <td>보관함 (성립된 <code>CardConnection</code>)</td>
+    </tr>
+    <tr>
+      <td><code>CONNECTION_REJECTED</code> (2)</td>
+      <td><code>ConnectionRequestsService.rejectRequest()</code></td>
+      <td>요청자</td>
+      <td>노출</td>
+      <td>보낸 요청 목록</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+알림 타입이 곧 토스트 대상 전부이므로 <strong>타입별 노출 분기 로직이 필요 없다.</strong>
+단, 재연결 시 목록을 다시 불러올 때 과거 알림이 토스트로 쏟아지지 않도록
+<strong>토스트는 SSE 이벤트 수신 경로에서만</strong> 띄운다 (<a href="#toast">6.4</a>).
+</p>
+
+<h3 id="tech-choice">1.2 기술 선택</h3>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>방식</th><th>앱 종료 시 전달</th><th>프론트 작업량</th><th>서버 부담</th><th>판정</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>SSE</strong> (Server-Sent Events)</td>
+      <td>불가</td>
+      <td>낮음 — 라이브러리 1개 (<code>fetch-event-source</code>)</td>
+      <td>커넥션 유지 (경량)</td>
+      <td><strong>채택</strong></td>
+    </tr>
+    <tr>
+      <td>WebSocket</td>
+      <td>불가</td>
+      <td>중간 — socket.io-client, 재연결/인증 직접 처리</td>
+      <td>커넥션 유지</td>
+      <td>보류 — 양방향 통신 요구 없음</td>
+    </tr>
+    <tr>
+      <td>Web Push (VAPID)</td>
+      <td>가능</td>
+      <td>높음 — Service Worker, 권한 UX, 구독 관리</td>
+      <td>낮음 (벤더 위임)</td>
+      <td>2단계 확장</td>
+    </tr>
+    <tr>
+      <td>폴링</td>
+      <td>불가</td>
+      <td>낮음</td>
+      <td>높음 (트래픽 낭비)</td>
+      <td>미채택</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+서버→클라이언트 단방향 전송만 필요하고, NestJS가 <code>@Sse()</code>를 내장하며,
+기존 <code>AuthGuard</code>·Pipe·Filter가 그대로 적용된다. WebSocket처럼 게이트웨이·어댑터·
+별도 포트·핸드셰이크가 필요 없다.
+</p>
+
+<div class="note">
+<p><strong>인증 방식 때문에 브라우저 내장 <code>EventSource</code>는 쓸 수 없다.</strong>
+이 프로젝트의 <code>auth.guard.ts:75-78</code>은 <code>Authorization: Bearer</code> 헤더만 읽는데,
+<code>EventSource</code>는 <strong>커스텀 헤더를 붙일 수 없다</strong>(브라우저 명세).
+쿠키에는 리프레시 토큰과 <code>device_id</code>만 들어 있고 액세스 토큰은 응답 바디로 나가므로
+<code>withCredentials</code>로도 인증이 통과하지 않는다.
+따라서 프론트는 <code>@microsoft/fetch-event-source</code>를 쓴다 (<a href="#fe-provider">6.1</a>).
+백엔드 인증 코드는 변경하지 않는다.</p>
+</div>
+
+<h2 id="roles">2. 역할 분리</h2>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr>
+      <th style="width:20%">영역</th>
+      <th style="width:40%"><span class="tag tag-fe">FRONTEND</span> Vite + React (JS)</th>
+      <th style="width:40%"><span class="tag tag-be">BACKEND</span> NestJS ×2</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>연결 수립</td>
+      <td><code>EventSource</code>로 스트림 열기<br>세션당 <strong>1개만</strong> 유지</td>
+      <td><code>text/event-stream</code> 응답 유지<br>인증 후 사용자별 Redis 채널 구독</td>
+    </tr>
+    <tr>
+      <td>인증</td>
+      <td><code>Authorization: Bearer</code> 헤더 전송<br>만료 시 갱신 후 재연결</td>
+      <td>기존 <code>AuthGuard</code>가 그대로 검증<br>실패 시 401 종료</td>
+    </tr>
+    <tr>
+      <td>알림 생성</td>
+      <td>—</td>
+      <td>수락/거절 트랜잭션 직후 <code>Notification</code> INSERT</td>
+    </tr>
+    <tr>
+      <td>인스턴스 간 전달</td>
+      <td>—</td>
+      <td><strong>Redis Pub/Sub</strong> — 발행 인스턴스와<br>커넥션 보유 인스턴스가 다를 수 있음</td>
+    </tr>
+    <tr>
+      <td>전달</td>
+      <td>이벤트 수신 → 상태 갱신 + 토스트</td>
+      <td>구독 중인 인스턴스가 해당 커넥션에 push</td>
+    </tr>
+    <tr>
+      <td>초기 데이터</td>
+      <td>진입 시 목록 API 호출<br>스트림 이벤트를 앞에 머지</td>
+      <td>커서 페이지네이션 목록 API 제공</td>
+    </tr>
+    <tr>
+      <td>UI 표현</td>
+      <td>벨 뱃지, 드롭다운, 토스트<br>클릭 시 보관함/요청목록 이동</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>읽음 상태</td>
+      <td>낙관적 업데이트 후 API 호출</td>
+      <td><code>readAt</code> 갱신, 미읽음 수 반환</td>
+    </tr>
+    <tr>
+      <td>재연결</td>
+      <td>브라우저 자동 재시도<br><code>onopen</code>에서 목록 재조회로 누락 보정</td>
+      <td>heartbeat 주기 전송으로<br>죽은 커넥션 조기 감지</td>
+    </tr>
+    <tr>
+      <td>정리</td>
+      <td>언마운트 · 로그아웃 시 <code>close()</code></td>
+      <td>연결 종료 시 Redis 구독 해제</td>
+    </tr>
+    <tr>
+      <td>인프라</td>
+      <td>dev: Vite proxy 설정</td>
+      <td><span class="tag tag-infra">INFRA</span> nginx 버퍼링 해제, 타임아웃 연장</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="flow">3. 연동 흐름</h2>
+
+<h3 id="flow-main">3.1 연결 요청 수락 → 요청자에게 알림 도달</h3>
+
+<p>
+아래에서 <strong>A</strong> = 요청을 보낸 사용자(알림 수신자), <strong>B</strong> = 요청을 받아 수락/거절하는 사용자.
+A와 B의 SSE 커넥션은 서로 다른 백엔드 인스턴스에 붙어 있을 수 있다.
+</p>
+
+<div class="flow">
+  <div class="flow-row">
+    <div class="flow-no">1</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-fe">FRONTEND (A)</div>
+      <div class="flow-desc">로그인 완료 → <code>NotificationProvider</code> 마운트
+        <span class="sub">로그인 상태가 false면 연결하지 않는다.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">2</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-fe">FRONTEND (A) → BACKEND</div>
+      <div class="flow-desc"><code>GET /api/notifications?limit=20</code>
+        <span class="sub">과거 알림과 미읽음 수를 먼저 확보. 이 응답은 토스트를 띄우지 않는다.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">3</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-fe">FRONTEND (A) → BACKEND</div>
+      <div class="flow-desc"><code>GET /api/notifications/stream</code> (<code>Authorization: Bearer</code> 헤더)
+        <span class="sub">nginx가 인스턴스 #1로 라우팅했다고 가정. 응답이 열린 채 유지된다.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">4</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">BACKEND #1</div>
+      <div class="flow-desc">Bearer 토큰 검증 → <code>noti:{A.userId}</code> Redis 채널 <code>SUBSCRIBE</code></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">5</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-fe">FRONTEND (B) → BACKEND</div>
+      <div class="flow-desc">B가 수락 버튼 클릭 → <code>PATCH /api/connection-requests/:id/accept</code>
+        <span class="sub">이 요청은 인스턴스 #2가 받을 수 있다.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">6</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">BACKEND #2</div>
+      <div class="flow-desc"><code>acceptRequest()</code> — 상태 변경 + <code>CardConnection</code> 생성 (기존 로직)</div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">7</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">BACKEND #2</div>
+      <div class="flow-desc"><code>Notification</code> INSERT — 수신자는 <code>request.requesterCard.userId</code>
+        <span class="sub">DB 저장이 먼저다. 전달에 실패해도 알림함에는 남아야 한다.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">8</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">BACKEND #2 → Redis</div>
+      <div class="flow-desc"><code>PUBLISH noti:{A.userId} {payload}</code>
+        <span class="sub">A의 커넥션이 어느 인스턴스에 있는지 알 필요가 없다. 이것이 Pub/Sub을 쓰는 이유.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">9</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">Redis → BACKEND #1</div>
+      <div class="flow-desc">채널을 구독 중인 #1이 메시지 수신 → 해당 커넥션의 <code>Subject</code>에 전달</div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">10</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">BACKEND #1 → FRONTEND (A)</div>
+      <div class="flow-desc"><code>event: notification</code> 프레임 전송</div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">11</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-fe">FRONTEND (A)</div>
+      <div class="flow-desc">리스너가 파싱 → 중복 확인 → 상태 갱신 → <strong>벨 뱃지 + 토스트</strong></div>
+    </div>
+  </div>
+</div>
+
+<h3 id="flow-reconnect">3.2 재연결 (네트워크 단절 · 서버 재배포)</h3>
+
+<div class="flow">
+  <div class="flow-row">
+    <div class="flow-no">1</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-both">연결 끊김</div>
+      <div class="flow-desc">브라우저가 <code>onerror</code> 발생 후 기본 3초 뒤 자동 재시도
+        <span class="sub">별도 재연결 코드를 작성할 필요가 없다.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">2</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">BACKEND</div>
+      <div class="flow-desc">신규 커넥션으로 처리, Redis 재구독
+        <span class="sub">재연결 시 다른 인스턴스에 붙어도 무방하다.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">3</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-fe">FRONTEND</div>
+      <div class="flow-desc"><code>onopen</code>에서 목록 API 재호출로 단절 구간 누락분 보정
+        <span class="sub">Pub/Sub은 오프라인 사용자에게 재전송하지 않으므로 이 보정이 필수다.
+        이 경로로 들어온 알림은 <strong>토스트를 띄우지 않는다.</strong></span></div>
+    </div>
+  </div>
+</div>
+
+<h3 id="flow-logout">3.3 로그아웃</h3>
+
+<p>
+프론트가 <code>es.close()</code>로 스트림을 닫고 알림 상태를 비운다.
+<strong>상태를 비우지 않으면 다음 로그인 사용자에게 이전 사용자의 알림이 노출된다.</strong>
+백엔드는 커넥션 종료 이벤트에서 Redis 구독을 해제한다.
+</p>
+
+<h3 id="flow-teardown">3.4 커넥션 회수 — 언제, 어떻게 정리되는가</h3>
+
+<p>
+SSE는 장수명 커넥션이라 <strong>"클라이언트가 사라졌을 때 서버가 그것을 언제 아는가"</strong>가
+리소스 관리의 핵심이다. 정상 종료와 비정상 종료의 동작이 완전히 다르다.
+</p>
+
+<h4>정상 경로 — 즉시 회수</h4>
+
+<pre><code>탭 닫기 / 브라우저 종료 / es.close()
+  → 브라우저(또는 OS)가 TCP FIN 전송
+  → nginx가 클라이언트 연결 종료 감지
+  → nginx가 upstream(Node) 연결도 끊음   (proxy_ignore_client_abort off = 기본값)
+  → Node의 req 'close' 이벤트
+  → Nest가 @Sse() Observable 구독 해제
+  → finalize() 실행 → Redis unsubscribe</code></pre>
+
+<p>
+브라우저 프로세스를 강제 종료해도 OS가 대신 FIN/RST를 보내므로 결과는 같다.
+<strong>이 경로는 추가 코드 없이 동작한다.</strong> 5.4의 <code>finalize()</code>가 여기에 걸려 있다.
+</p>
+
+<h4>비정상 경로 — 신호가 오지 않는 경우</h4>
+
+<p>
+랜선 뽑기, 와이파이 이탈, 절전 모드, 지하철 진입. <strong>기계나 네트워크 경로 자체가 사라지면
+FIN이 오지 않는다.</strong> 서버는 커넥션이 살아있다고 믿고 계속 붙잡는다.
+정리되는 유일한 계기는 <strong>다음 쓰기 시도가 실패하는 것</strong>이며, 여기서 heartbeat가 작동한다.
+</p>
+
+<pre><code>t=0       클라이언트 소멸 (신호 없음)
+t=20초    nginx가 heartbeat write() → 커널 송신 버퍼에 적재, 성공 반환
+          커널이 패킷 전송 → ACK 없음
+t=20초~   커널이 지수 백오프로 재전송 (0.2s → 0.4s → … → 120s 상한 반복)
+t=약 15분  tcp_retries2(기본 15회) 소진 → 소켓 ETIMEDOUT
+          nginx가 클라이언트·upstream 연결 종료 → finalize() → Redis unsubscribe</code></pre>
+
+<div class="note">
+<p><strong>송신 버퍼가 차서 죽는 것이 아니다.</strong> heartbeat는 15바이트 남짓이고
+리눅스 기본 송신 버퍼는 16KB 이상이라, 버퍼가 차려면 <code>16384 ÷ 15 × 20초 ≈ 6시간</code>이 걸린다.
+그 전에 <strong>TCP 재전송 소진(약 15분)</strong>이 먼저 커넥션을 끝낸다.</p>
+</div>
+
+<h4>heartbeat의 이중 역할</h4>
+
+<p>
+20초 heartbeat는 프록시 유휴 타임아웃 방지용으로만 넣은 것이 아니다.
+<strong>재전송 타이머를 시작시키는 트리거</strong>이기도 하다.
+서버가 아무것도 쓰지 않으면 커널은 상대가 죽었는지 알 방법이 없다 —
+TCP는 침묵을 이상하게 여기지 않는다. 그 상태로 방치되면
+<code>tcp_keepalive_time</code>(기본 7200초 = <strong>2시간</strong>)이 돌 때까지 커넥션이 남는다.
+<strong>heartbeat를 끄면 이 회수 메커니즘 자체가 사라진다.</strong>
+</p>
+
+<div class="note">
+<p><strong>감지 주체는 nginx다.</strong> 죽은 구간은 클라이언트↔nginx이고 Node가 보는 상대는 nginx다.
+따라서 <strong>Node 쪽에 <code>socket.setKeepAlive()</code>를 걸어도 소용없다.</strong>
+nginx가 클라이언트로 heartbeat를 흘려보내다 실패하면서 upstream을 끊어줘야
+비로소 Node의 <code>finalize</code>가 돈다.</p>
+</div>
+
+<h4>회수 시점 요약</h4>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th style="width:38%">상황</th><th style="width:26%">신호</th><th style="width:36%">회수까지</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>탭 닫기 · 브라우저 종료</td><td>FIN</td><td>즉시</td></tr>
+    <tr><td>브라우저 프로세스 강제 종료</td><td>OS가 FIN/RST</td><td>즉시</td></tr>
+    <tr><td>SPA 페이지 이동 · 로그아웃</td><td><code>es.close()</code> → FIN</td><td>즉시</td></tr>
+    <tr><td>서버 재배포</td><td>프로세스 종료</td><td>즉시</td></tr>
+    <tr><td>절전 후 복귀</td><td>대개 RST</td><td>복귀 즉시</td></tr>
+    <tr><td><strong>랜선 뽑기 · 와이파이 이탈</strong></td><td>없음</td><td><strong>약 15분</strong> (TCP 재전송 소진)</td></tr>
+    <tr><td>heartbeat를 보내지 않을 경우</td><td>없음</td><td>약 2시간 (TCP keepalive)</td></tr>
+    <tr><td>송신 버퍼 포화</td><td>—</td><td>약 6시간 — 도달 전에 위에서 끝남</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>튜닝하지 않는다</h4>
+
+<p>
+<code>tcp_retries2</code>는 시스템 전역 설정이라 낮추면 일반 API 커넥션까지 영향을 받는다.
+불안정한 모바일 환경에서 정상 요청이 끊길 수 있어 권하지 않는다.
+인스턴스 2대 규모에서 15분짜리 좀비 커넥션 수십 개는 실질적 부담이 아니다.
+필요한 것은 코드가 아니라 <strong>관측</strong>이다.
+</p>
+
+<pre><code># 인스턴스별 실제 소켓 수
+ss -tn state established '( sport = :3000 )' | wc -l
+
+# Redis 구독 채널 수 — 이것만 단조 증가하면 좀비가 아니라 finalize 누락(코드 버그)
+redis-cli PUBSUB CHANNELS 'noti:*' | wc -l</code></pre>
+
+<p>
+두 수치가 <strong>접속 중인 사용자 수와 대략 비례</strong>하면 정상이다.
+운영 환경에서는 매번 셸에 붙지 않고 <a href="#observability">8장</a>의
+<code>sse_stats</code> 로깅으로 Grafana에서 추세를 본다.
+</p>
+
+<h2 id="api">4. API 명세</h2>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>메서드</th><th>경로</th><th>설명</th><th>응답</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>GET</td><td><code>/api/notifications/stream</code></td>
+      <td>SSE 스트림. 연결 유지형</td>
+      <td><code>text/event-stream</code></td>
+    </tr>
+    <tr>
+      <td>GET</td><td><code>/api/notifications</code></td>
+      <td>목록 조회 (<code>cursor</code>, <code>limit</code>)</td>
+      <td><code>{ items, nextCursor, unreadCount }</code></td>
+    </tr>
+    <tr>
+      <td>PATCH</td><td><code>/api/notifications/:id/read</code></td>
+      <td>단건 읽음 처리</td>
+      <td><code>{ unreadCount }</code></td>
+    </tr>
+    <tr>
+      <td>PATCH</td><td><code>/api/notifications/read-all</code></td>
+      <td>전체 읽음 처리</td>
+      <td><code>{ unreadCount: 0 }</code></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="api-payload">4.1 이벤트 페이로드</h3>
+
+<pre><code>event: notification
+id: 01J8ZK3M4N5P6Q7R8S9T0V1W2X
+data: {"id":"01J8ZK3M4N5P6Q7R8S9T0V1W2X","type":1,
+       "requestId":"01J8ZA...","connectionId":"01J8ZB...",
+       "counterpartCardId":"01J8ZC...","counterpartName":"김노디",
+       "createdAt":"2026-07-29T04:12:33.000Z"}
+
+event: ping
+data:
+
+</code></pre>
+
+<ul>
+  <li><code>type</code>은 <code>1 = ACCEPTED</code>, <code>2 = REJECTED</code>. 표시 문구는 프론트가 조립한다 (서버가 문장을 들고 있으면 카피 수정 때마다 배포가 필요하다).</li>
+  <li><code>connectionId</code>는 수락일 때만 존재. 토스트/알림 클릭 시 보관함 상세로 이동하는 데 쓴다.</li>
+  <li><code>event: ping</code>은 20초 주기 heartbeat다. 프론트에 <code>ping</code> 리스너가 없으므로 브라우저가 디스패치 후 그냥 버린다 (<a href="#fe-heartbeat">6.6</a>). 역할은 <a href="#flow-teardown">3.4</a> 참고.</li>
+</ul>
+
+<div class="note">
+<p><strong>SSE 주석 프레임(<code>: heartbeat</code>)이 아니라 이름 붙은 이벤트다.</strong>
+NestJS <code>@Sse()</code>는 <code>MessageEvent</code> 객체를 직렬화하는 방식이라
+<code>id</code> / <code>event</code> / <code>data</code> / <code>retry</code> 필드만 쓸 수 있고,
+콜론 주석 프레임은 표현할 수 없다. 굳이 주석 프레임을 보내려면 <code>@Res()</code>로
+응답 객체를 직접 잡아야 하는데 그럴 이유가 없다 — 기능적 차이는 없다.</p>
+</div>
+
+<h2 id="backend">5. 백엔드 구현</h2>
+
+<h3 id="be-layout">5.1 모듈 배치</h3>
+
+<p>
+기존 구조의 경계를 그대로 따른다 —
+<code>src/lib/</code>는 기술 인프라(prisma · redis · s3 · oauth · logger),
+<code>src/module/</code>은 도메인, <code>src/common/</code>은 횡단 관심사.
+</p>
+
+<pre><code>src/lib/redis/
+  redis.module.ts             # RedisService + RedisPubSubService 둘 다 export
+  redis.service.ts            # 기존 그대로 (get / set / del)
+  redis-pubsub.service.ts     # 신규 — sub·pub 커넥션, subscribe / publish / countChannels
+  redis.config.ts             # 신규 — 연결 옵션 팩토리 (설정 중복 제거)
+
+src/module/notifications/
+  notifications.module.ts
+  notifications.controller.ts       # @Sse('stream') + 목록 · 읽음 API
+  notifications.service.ts          # 채널 규칙(noti:{userId}) · 알림 생성 · sse_stats 로깅
+  notifications.repository.ts
+  dto/notification-list.query.dto.ts
+  type/notification-type.enum.ts
+  type/notification-response.type.ts</code></pre>
+
+<p>
+<code>connections</code> 모듈이 controller / service / repository / module + <code>dto/</code> + <code>type/</code>로
+구성된 것과 같은 형태다.
+</p>
+
+<h4>pub/sub을 lib에 두는 이유</h4>
+
+<p>
+현재 <code>lib/redis/redis.service.ts</code>는 클라이언트 1개를 <code>private</code>로 감싸고
+<code>get</code> / <code>set</code> / <code>del</code>만 노출한다. pub/sub이 없고 원본 클라이언트를 꺼낼 수도 없다.
+그렇다고 <code>module/notifications/</code>에서 <code>new Redis(...)</code>를 하면
+<strong>연결 설정이 두 군데로 갈라진다</strong> — <code>redis.service.ts:15-19</code>의
+host · port · username · password 읽는 코드를 복사하게 되고,
+나중에 TLS나 재시도 정책을 추가할 때 한쪽만 고치는 사고가 난다.
+</p>
+
+<p>
+그리고 pub/sub 커넥션은 성격상 기존 <code>RedisService</code>와 <strong>합칠 수 없다.</strong>
+<code>subscribe</code> 모드에 들어간 커넥션은 <code>get</code> / <code>set</code>이 거부되기 때문이다.
+이 제약은 <strong>클래스를 나눠야 하는 이유이지, 도메인 쪽으로 밀어낼 이유가 아니다.</strong>
+</p>
+
+<h4>경계선</h4>
+
+<p><code>RedisPubSubService</code>에는 알림 도메인 지식이 없다. 채널 이름도 페이로드도 호출자가 정한다.</p>
+
+<pre><code>// lib — 채널이 무엇인지 모른다
+subscribe(channel: string): Observable&lt;string&gt;
+publish(channel: string, message: string): Promise&lt;void&gt;
+countChannels(pattern: string): Promise&lt;number&gt;
+
+// module — noti:{userId} 규칙을 아는 쪽
+private channelOf(userId: string) { return `noti:${userId}`; }</code></pre>
+
+<div class="note">
+<p><code>noti:</code> 접두사가 <code>lib/</code>에 들어가는 순간 인프라가 도메인을 알게 되고,
+<code>new Redis()</code>가 <code>module/</code>에 들어가면 도메인이 인프라 설정을 알게 된다.
+지금 나눠두면 나중에 다른 실시간 기능이 생겨도 <code>lib</code> 쪽은 그대로 재사용된다.</p>
+</div>
+
+<h3 id="be-model">5.2 데이터 모델 (Prisma)</h3>
+
+<p>기존 스키마 컨벤션(ULID <code>Char(26)</code>, snake_case <code>@map</code>, <code>DateTime(3)</code>, 상태값은 <code>TinyInt</code>)을 그대로 따른다.</p>
+
+<pre><code>model Notification {
+  id String @id @default(ulid()) @db.Char(26)
+
+  userId String @map("user_id") @db.Char(26)   // 수신자 = 요청을 보낸 사람
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 1: CONNECTION_ACCEPTED, 2: CONNECTION_REJECTED
+  type Int @db.TinyInt
+
+  // 화면 조립에 필요한 최소 스냅샷
+  // { requestId, connectionId?, counterpartCardId, counterpartName }
+  payload Json
+
+  readAt    DateTime? @map("read_at") @db.DateTime(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+
+  @@index([userId, createdAt(sort: Desc)])   // 목록 조회
+  @@index([userId, readAt])                  // 미읽음 수 집계
+  @@map("notifications")
+}</code></pre>
+
+<pre><code>// src/module/notifications/type/notification-type.enum.ts
+// ConnectionRequestStatus 와 동일한 const 객체 패턴 (TS enum 비교 lint 회피)
+export const NotificationType = {
+  CONNECTION_ACCEPTED: 1,
+  CONNECTION_REJECTED: 2,
+} as const;
+
+export type NotificationType =
+  (typeof NotificationType)[keyof typeof NotificationType];</code></pre>
+
+<div class="note">
+<p><strong>상대 카드 정보는 스냅샷으로 저장한다.</strong> 카드가 삭제되거나 이름이 바뀌어도
+알림 목록은 발생 시점 그대로 보여야 한다. <code>CardConnection</code>이 이미
+스냅샷 전략을 쓰고 있으므로 같은 원칙을 따른다. 다만 알림은 목록 렌더에 필요한
+<strong>최소 필드만</strong> 담는다 — 카드 전체를 넣으면 행이 급격히 커진다.</p>
+</div>
+
+<h3 id="be-controller">5.3 SSE 컨트롤러</h3>
+
+<pre><code>// src/module/notifications/notifications.controller.ts
+@Controller('notifications')
+export class NotificationsController {
+  constructor(private readonly notifications: NotificationsService) {}
+
+  @Sse('stream')
+  @UseGuards(AuthGuard)
+  stream(@CurrentUser() user: User): Observable&lt;MessageEvent&gt; {
+    return merge(
+      this.notifications.stream(user.id),
+      // heartbeat — `event: ping` 프레임으로 나간다. 프록시 유휴 타임아웃 방지 +
+      // 죽은 커넥션 탐지 트리거 두 역할을 겸한다 (3.4 참고). 끄면 안 된다.
+      interval(20_000).pipe(map(() =&gt; ({ type: 'ping', data: '' }))),
+    ).pipe(
+      // 토큰은 연결 시점에 1회만 검증된다. 상한이 없으면 액세스 토큰이 만료된 뒤에도
+      // 스트림이 몇 시간씩 살아남는다. 주기적으로 끊어 재인증을 강제한다.
+      takeUntil(timer(30 * 60 * 1000)),
+    );
+  }
+}</code></pre>
+
+<div class="note">
+<p><strong>스트림 수명을 제한하는 이유.</strong> <code>AuthGuard</code>는 <strong>연결을 맺는 순간 한 번만</strong>
+토큰을 검증한다. SSE는 응답이 끝나지 않는 요청이므로, 상한이 없으면
+액세스 토큰이 만료되고 심지어 계정이 정지되어도 그 커넥션은 계속 알림을 받는다.
+30분마다 서버가 스트림을 <code>complete</code>하면 클라이언트가 재연결하면서
+새 토큰으로 다시 인증받는다. 프론트 입장에서는 <code>onerror</code> → 재시도 경로라
+6.1 코드에 추가 처리가 필요 없다.</p>
+</div>
+
+<p>
+게이트웨이도 어댑터도 별도 포트도 필요 없다. SSE는 평범한 HTTP 응답이라
+기존 <code>AuthGuard</code> · Pipe · Filter가 그대로 적용된다.
+<strong>그런데 바로 그 "그대로 적용된다"가 문제를 일으킨다.</strong>
+</p>
+
+<h4>⚠ 전역 인터셉터가 SSE 프레임을 깨뜨린다 — 반드시 선행 수정</h4>
+
+<pre><code>// main.ts:16
+app.useGlobalInterceptors(new TransformInterceptor());
+
+// common/interceptor/transform.interceptor.ts — 모든 방출값에 map 이 걸린다
+return next.handle().pipe(
+  map((data) =&gt; new ResponseSuccess(data, HttpStatus.OK)),
+);</code></pre>
+
+<p>
+<code>@Sse()</code>가 반환하는 Observable에도 이 <code>map</code>이 적용되어
+<strong>이벤트 하나하나가 <code>ResponseSuccess</code>로 감싸진다.</strong>
+<code>ResponseSuccess</code>에는 <code>type</code> 필드가 없으므로
+Nest의 SSE 직렬화가 이벤트 이름을 잃는다.
+</p>
+
+<pre><code>의도한 프레임                     실제로 나가는 프레임
+─────────────────────            ──────────────────────────────────────
+event: notification              data: {"status":200,"timestamp":"...",
+data: {"id":"01J8…","type":1}           "data":{"type":"notification","data":"…"}}
+                                 ↑ event: 줄이 없다 → 기본 message 이벤트로 디스패치</code></pre>
+
+<div class="note">
+<p><strong>프론트의 <code>addEventListener('notification', …)</code>이 영원히 발동하지 않는다.</strong>
+에러도 나지 않고 커넥션도 정상으로 보이는데 알림만 오지 않는,
+원인을 찾기 매우 어려운 형태로 실패한다. 6.6에서 경고한 <code>onmessage</code> 함정에
+구조적으로 빠지는 셈이다.</p>
+</div>
+
+<p><strong>수정</strong> — 인터셉터에서 SSE 라우트를 통과시킨다.</p>
+
+<pre><code>@Injectable()
+export class TransformInterceptor&lt;T&gt;
+  implements NestInterceptor&lt;T, ResponseSuccess&lt;T&gt;&gt;
+{
+  constructor(private readonly reflector: Reflector) {}
+
+  intercept(context: ExecutionContext, next: CallHandler&lt;T&gt;) {
+    // @Sse() 는 핸들러에 SSE_METADATA('sse') 를 남긴다.
+    // SSE 응답은 스트림이므로 래핑하면 프레임 규격이 깨진다.
+    if (this.reflector.get&lt;boolean&gt;(SSE_METADATA, context.getHandler())) {
+      return next.handle();
+    }
+    // ... 기존 로직 그대로
+  }
+}</code></pre>
+
+<p>
+현재 <code>main.ts</code>가 <code>new TransformInterceptor()</code>로 직접 인스턴스화하고 있어
+<code>Reflector</code>가 주입되지 않는다. <code>AppModule</code>에서
+<code>APP_INTERCEPTOR</code> 프로바이더로 등록하는 방식으로 바꿔야 한다.
+</p>
+
+<pre><code>// app.module.ts
+providers: [
+  { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
+]
+// main.ts 의 app.useGlobalInterceptors(...) 는 제거</code></pre>
+
+<p>
+이 수정 없이는 <strong>알림 기능 전체가 동작하지 않는다.</strong>
+7.2의 Level 1(curl)에서 바로 드러나므로 구현 첫 단계에서 확인할 것.
+</p>
+
+<h3 id="be-redis">5.4 Redis Pub/Sub <span class="tag tag-be">인스턴스 2대 필수</span></h3>
+
+<p>
+인스턴스가 2대이므로 <strong>수락을 처리한 서버와 요청자의 SSE 커넥션을 쥔 서버가 다를 확률이 약 50%다.</strong>
+인메모리 <code>Subject</code>만 쓰면 절반의 알림이 실시간으로 도달하지 않는다.
+Redis Pub/Sub이 이 간극을 메운다. <code>ioredis</code>가 이미 의존성에 있다.
+</p>
+
+<h4><code>lib/redis/redis-pubsub.service.ts</code> — 인프라</h4>
+
+<pre><code>@Injectable()
+export class RedisPubSubService implements OnModuleInit, OnModuleDestroy {
+  private readonly sub: Redis;
+  private readonly pub: Redis;
+  private readonly channels = new Map&lt;string, Subject&lt;string&gt;&gt;();
+
+  constructor(
+    configService: ConfigService,
+    @InjectPinoLogger(RedisPubSubService.name)
+    private readonly logger: PinoLogger,
+  ) {
+    // redis.config.ts 의 옵션 팩토리를 RedisService 와 공유한다
+    this.sub = new Redis(buildRedisOptions(configService));
+    this.pub = new Redis(buildRedisOptions(configService));
+
+    // ★ 핸들러가 없으면 ioredis 의 error 가 unhandled 로 프로세스를 죽인다
+    this.sub.on('error', (e) =&gt; this.logger.error(`sub: ${e.message}`));
+    this.pub.on('error', (e) =&gt; this.logger.error(`pub: ${e.message}`));
+
+    this.sub.on('message', (channel, raw) =&gt; {
+      this.channels.get(channel)?.next(raw);
+    });
+  }
+
+  async onModuleInit() {
+    await Promise.all([this.sub.connect(), this.pub.connect()]);
+  }
+
+  /** 채널 구독. 구독자가 모두 떠나면 자동으로 UNSUBSCRIBE 한다. */
+  subscribe(channel: string): Observable&lt;string&gt; {
+    let subject = this.channels.get(channel);
+    if (!subject) {
+      subject = new Subject&lt;string&gt;();
+      this.channels.set(channel, subject);
+      void this.sub.subscribe(channel);
+    }
+    return subject.asObservable().pipe(
+      finalize(() =&gt; {                       // 커넥션 종료 시 정리
+        if (!subject.observed) {             // 같은 유저의 다른 탭이 없을 때만
+          this.channels.delete(channel);
+          void this.sub.unsubscribe(channel);
+        }
+      }),
+    );
+  }
+
+  async publish(channel: string, message: string) {
+    await this.pub.publish(channel, message);
+  }
+
+  /** 8.1 sse_stats 용. sub 은 subscribe 모드라 명령이 거부되므로 pub 으로 조회. */
+  async countChannels(pattern: string): Promise&lt;number&gt; {
+    const channels = await this.pub.pubsub('CHANNELS', pattern);
+    return channels.length;
+  }
+
+  /** 로컬 구독 수 — Redis 왕복 없이 이 인스턴스의 상태만 본다. */
+  get localChannelCount(): number {
+    return this.channels.size;
+  }
+
+  async onModuleDestroy() {
+    await Promise.allSettled([this.sub.quit(), this.pub.quit()]);
+  }
+}</code></pre>
+
+<div class="note">
+<p><strong>Redis 커넥션은 반드시 분리한다.</strong> <code>subscribe</code> 모드에 들어간 커넥션은
+일반 명령을 받지 못한다. 기존 <code>RedisService</code>의 캐시용 클라이언트를 재사용하면
+<code>get</code> / <code>set</code>이 전부 깨진다. <code>lazyConnect: true</code> + <code>onModuleInit</code> 연결,
+<code>error</code> 핸들러 등록, <code>@InjectPinoLogger</code> 로거 주입은
+기존 <code>redis.service.ts</code>의 패턴을 그대로 따른 것이다.</p>
+</div>
+
+<h4><code>module/notifications/notifications.service.ts</code> — 도메인</h4>
+
+<p>채널 이름 규칙과 이벤트 형식은 도메인 쪽이 소유한다.</p>
+
+<pre><code>@Injectable()
+export class NotificationsService {
+  constructor(
+    private readonly pubsub: RedisPubSubService,
+    private readonly repository: NotificationsRepository,
+  ) {}
+
+  private channelOf(userId: string) {
+    return `noti:${userId}`;
+  }
+
+  /** SSE 스트림용 — 원문 문자열을 MessageEvent 로 감싼다 */
+  stream(userId: string): Observable&lt;MessageEvent&gt; {
+    return this.pubsub
+      .subscribe(this.channelOf(userId))
+      .pipe(map((raw) =&gt; ({ type: 'notification', data: raw })));
+  }
+
+  async create(userId: string, dto: CreateNotificationDto) {
+    const noti = await this.repository.create({ id: ulid(), userId, ...dto });
+
+    // 발행 실패가 호출자(수락/거절)를 실패시키면 안 된다 — 5.5 참고
+    try {
+      await this.pubsub.publish(this.channelOf(userId), JSON.stringify(noti));
+    } catch (e) {
+      this.logger.warn({ evt: 'noti_publish_failed', id: noti.id, err: String(e) });
+    }
+    return noti;
+  }
+}</code></pre>
+
+<h3 id="be-hook">5.5 기존 서비스 연동 지점</h3>
+
+<p>
+<code>src/module/connections/connection-requests.service.ts</code>의
+<code>acceptRequest()</code>(107행)와 <code>rejectRequest()</code>(121행) 두 곳에만 후킹한다.
+<code>getPendingRequestAsReceiver()</code>가 반환하는 <code>request</code>에
+<code>requesterCard</code>가 포함되어 있으므로 (<code>cancelRequest()</code>에서
+<code>request.requesterCard.userId</code>를 이미 참조 중) 수신자 조회를 위한 추가 쿼리가 필요 없다.
+</p>
+
+<pre><code>async acceptRequest(user: User, id: string): Promise&lt;void&gt; {
+  const request = await this.getPendingRequestAsReceiver(user, id);
+  try {
+    const connection = await this.connectionsRepository.acceptRequest(request);
+  } catch (e) { /* 기존 충돌 처리 유지 */ }
+
+  // 알림은 본 트랜잭션 밖에서. 실패해도 수락 자체는 성립해야 한다.
+  await this.notifications.create(request.requesterCard.userId, {
+    type: NotificationType.CONNECTION_ACCEPTED,
+    payload: {
+      requestId: request.id,
+      connectionId: connection.id,
+      counterpartCardId: request.receiverCardId,
+      counterpartName: request.receiverCard.name,
+    },
+  });
+}</code></pre>
+
+<div class="note">
+<p><strong>알림 실패가 수락/거절을 롤백해서는 안 된다.</strong> 같은 트랜잭션에 묶으면
+Redis 장애가 연결 수락 API 전체를 실패시킨다. 트랜잭션 밖에서 호출하고,
+<code>publish</code> 실패는 로깅만 하고 삼킨다 — DB에는 이미 저장되어 있으므로
+사용자가 알림함을 열면 보인다.</p>
+</div>
+
+<h3 id="be-nginx">5.6 nginx 설정</h3>
+
+<p>기본 설정 그대로면 nginx가 응답을 버퍼링해서 <strong>이벤트가 실시간으로 나가지 않는다.</strong></p>
+
+<pre><code>location /api/notifications/stream {
+    proxy_pass http://nodi_be;
+    proxy_http_version 1.1;
+
+    proxy_buffering off;          # 필수 — 없으면 이벤트가 버퍼에 갇힌다
+    proxy_cache off;
+    proxy_set_header Connection '';
+    proxy_read_timeout 3600s;     # heartbeat 가 멈췄을 때를 대비한 안전장치
+    chunked_transfer_encoding off;
+
+    access_log off;               # 장수명 요청이 로그를 오염시킨다
+}</code></pre>
+
+<div class="note">
+<p><strong><code>proxy_read_timeout</code>은 기본값(60초)으로도 당장은 끊기지 않는다.</strong>
+이 값은 upstream으로부터의 <em>연속된 두 읽기 사이</em> 간격이라, 20초 heartbeat가
+계속 타이머를 리셋하기 때문이다. 그래도 명시하는 이유는 heartbeat가 멈추거나
+주기를 늘리는 변경이 있을 때 조용히 끊기는 것을 막기 위해서다.
+<strong>진짜 필수는 <code>proxy_buffering off</code></strong> 하나다 — 이건 없으면 즉시 깨진다.</p>
+</div>
+
+<p>
+<code>nginx/conf.d/default.conf</code>의 기존 <code>location /</code>에는
+<code>proxy_next_upstream error timeout …</code>이 설정되어 있는데,
+이 지시어는 <strong>응답 헤더를 받기 전에만</strong> 동작하므로 스트림 도중 재시도가 발생하지는 않는다.
+다만 위 전용 location을 <code>location /</code>보다 먼저 두어야 매칭이 우선한다.
+</p>
+
+<p>
+스트림은 어느 인스턴스에 붙어도 되므로 <strong>sticky session 설정은 불필요하다.</strong>
+Redis Pub/Sub이 인스턴스 위치를 무의미하게 만드는 것이 이 설계의 핵심 이점이다.
+</p>
+
+<h2 id="frontend">6. 프론트엔드 구현 <span class="tag tag-fe">Vite + React + JS</span></h2>
+
+<h3 id="fe-provider">6.1 Provider</h3>
+
+<pre><code>npm i @microsoft/fetch-event-source</code></pre>
+
+<p><code>src/contexts/NotificationContext.jsx</code></p>
+
+<pre><code>import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
+import { useAuth } from './AuthContext';
+import { fetchNotifications } from '../api/notifications';
+import { toast } from '../lib/toast';
+
+const NotificationContext = createContext(null);
+
+export function NotificationProvider({ children }) {
+  const { isLoggedIn, getAccessToken, refreshAccessToken } = useAuth();
+  const [items, setItems] = useState([]);
+  const [retryKey, setRetryKey] = useState(0);   // 토큰 갱신 후 재연결 트리거
+
+  // 목록 API로 상태를 덮어쓴다. 토스트는 띄우지 않는다.
+  const syncFromServer = useCallback(async () =&gt; {
+    try {
+      const { items } = await fetchNotifications({ limit: 20 });
+      setItems(items);
+    } catch (e) {
+      console.error('[noti] 목록 동기화 실패', e);
+    }
+  }, []);
+
+  useEffect(() =&gt; {
+    if (!isLoggedIn) {
+      setItems([]);              // 로그아웃 시 이전 사용자 알림 제거
+      return;
+    }
+
+    const ctrl = new AbortController();
+
+    void fetchEventSource('/api/notifications/stream', {
+      signal: ctrl.signal,
+      headers: { Authorization: `Bearer ${getAccessToken()}` },
+
+      // 기본값(false)이면 탭이 백그라운드로 가는 순간 커넥션을 닫는다.
+      // 다른 탭을 보는 동안에도 알림을 받아야 하므로 true.
+      openWhenHidden: true,
+
+      // 최초 연결 + 재연결 모두 여기를 지난다 → 단절 구간 누락 보정
+      async onopen(res) {
+        if (res.ok) { void syncFromServer(); return; }
+        // throw = 재시도 중단. 401 은 재시도해도 계속 실패한다.
+        if (res.status === 401) throw new AuthExpiredError();
+        throw new Error(`stream failed: ${res.status}`);
+      },
+
+      // ★ EventSource 와 달리 이벤트별 리스너가 없다. 모든 프레임이 여기로 온다.
+      onmessage(ev) {
+        if (ev.event !== 'notification') return;   // ping 등은 버린다
+        const noti = JSON.parse(ev.data);
+        setItems((prev) =&gt; {
+          if (prev.some((p) =&gt; p.id === noti.id)) return prev;   // 중복 방지
+          showToast(noti);                                        // 실시간 수신에만 토스트
+          return [noti, ...prev];
+        });
+      },
+
+      onerror(err) {
+        if (err instanceof AuthExpiredError) {
+          void refreshAccessToken().then(() =&gt; setRetryKey((k) =&gt; k + 1));
+          throw err;              // 이 스트림은 중단, 새 토큰으로 다시 연다
+        }
+        return 3000;              // 숫자 반환 = 해당 ms 후 재시도
+      },
+    });
+
+    return () =&gt; ctrl.abort();
+  }, [isLoggedIn, retryKey, syncFromServer]);
+
+  const value = useMemo(
+    () =&gt; ({
+      items,
+      unread: items.filter((i) =&gt; !i.readAt).length,
+      refresh: syncFromServer,
+    }),
+    [items, syncFromServer],
+  );
+
+  return (
+    &lt;NotificationContext.Provider value={value}&gt;
+      {children}
+    &lt;/NotificationContext.Provider&gt;
+  );
+}
+
+export function useNotifications() {
+  const ctx = useContext(NotificationContext);
+  if (!ctx) throw new Error('NotificationProvider 안에서만 사용할 수 있습니다.');
+  return ctx;
+}</code></pre>
+
+<h4><code>EventSource</code>와 달라지는 점</h4>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th style="width:20%">항목</th><th style="width:34%">EventSource (쓸 수 없음)</th><th style="width:46%">fetch-event-source</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>인증</td>
+      <td>헤더 불가 — 쿠키만</td>
+      <td><strong><code>headers</code> 지정 가능 ← 채택 이유</strong></td>
+    </tr>
+    <tr>
+      <td>이벤트 분기</td>
+      <td><code>addEventListener('notification')</code></td>
+      <td><strong>단일 <code>onmessage</code></strong> — <code>ev.event</code>로 직접 걸러야 한다</td>
+    </tr>
+    <tr>
+      <td>종료</td>
+      <td><code>es.close()</code></td>
+      <td><code>AbortController.abort()</code></td>
+    </tr>
+    <tr>
+      <td>재연결</td>
+      <td>브라우저 자동 (3초)</td>
+      <td><code>onerror</code> 반환값이 간격(ms). <code>throw</code>하면 중단</td>
+    </tr>
+    <tr>
+      <td>백그라운드 탭</td>
+      <td>연결 유지</td>
+      <td><strong>기본값은 끊김</strong> — <code>openWhenHidden: true</code> 필요</td>
+    </tr>
+    <tr>
+      <td>상태 확인</td>
+      <td><code>readyState</code></td>
+      <td>없음 — <code>onopen</code>에서 <code>res.status</code>로 판단</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+<p><strong><code>onerror</code>의 반환값과 <code>throw</code>는 의미가 정반대다.</strong>
+숫자를 반환하면 그 밀리초 뒤 재시도하고, 예외를 던지면 재시도를 영구 중단한다.
+401에서 그냥 숫자를 반환하면 <strong>만료된 토큰으로 3초마다 무한 재시도</strong>하며
+서버에 401 로그를 쌓는다. 반드시 <code>throw</code>로 끊고 토큰 갱신 후
+<code>retryKey</code>를 올려 새 스트림을 열어야 한다.</p>
+</div>
+
+<div class="note">
+<p><strong><code>setItems</code> 콜백 안에서 토스트를 띄우는 이유.</strong> React StrictMode(개발)에서
+상태 업데이터가 두 번 호출될 수 있어 토스트가 중복될 여지가 있다. 신경 쓰인다면
+중복 검사 결과를 밖으로 빼서 <code>useEffect</code> 밖 <code>seenIds</code> Set(<code>useRef</code>)으로
+관리하는 편이 안전하다. 프로덕션 빌드에서는 발생하지 않는다.</p>
+</div>
+
+<h3 id="fe-placement">6.2 배치 위치</h3>
+
+<p><code>src/main.jsx</code> 또는 <code>src/App.jsx</code></p>
+
+<pre><code>&lt;AuthProvider&gt;              {/* 로그인 상태를 읽어야 하므로 안쪽 */}
+  &lt;NotificationProvider&gt;    {/* 라우터 바깥 — 페이지 이동해도 연결 유지 */}
+    &lt;RouterProvider router={router} /&gt;
+    &lt;ToastContainer /&gt;
+  &lt;/NotificationProvider&gt;
+&lt;/AuthProvider&gt;</code></pre>
+
+<ul>
+  <li><strong><code>AuthProvider</code> 안쪽</strong> — 로그인 상태에 따라 연결 시점을 제어하기 위해</li>
+  <li><strong>Router 바깥쪽</strong> — 라우터 내부 레이아웃에 두면 페이지 이동마다 언마운트되어 재연결이 반복된다</li>
+</ul>
+
+<h3 id="fe-vite">6.3 Vite dev 프록시</h3>
+
+<p>
+Bearer 헤더 방식이라 쿠키 문제는 없지만, <code>localhost:5173</code> → <code>localhost:3000</code>
+교차 출처에서는 <code>Authorization</code> 헤더가 <strong>단순 요청 조건을 벗어나 preflight를 유발</strong>한다.
+프록시로 동일 출처를 만들면 preflight 자체가 사라져 더 단순하다.
+</p>
+
+<pre><code>// vite.config.js
+export default defineConfig({
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        // Vite 프록시(http-proxy)는 SSE를 그대로 흘려보낸다.
+        // 별도 buffering 옵션은 필요 없다.
+      },
+    },
+  },
+});</code></pre>
+
+<p>
+프록시를 쓰지 않고 절대 URL로 붙일 경우, <code>main.ts:24</code>의
+<code>enableCors({ origin: true, credentials: true })</code>가 dev에서는 그대로 통과시킨다.
+다만 주석대로 <strong>운영에서는 허용 도메인을 명시</strong>해야 하고,
+그때 <code>Authorization</code>이 허용 헤더에 포함되는지 확인해야 한다.
+</p>
+
+<h3 id="toast">6.4 토스트</h3>
+
+<p>알림 타입이 두 개뿐이므로 분기가 단순하다. 문구는 프론트가 조립한다.</p>
+
+<pre><code>const NOTIFICATION_TYPE = {
+  CONNECTION_ACCEPTED: 1,
+  CONNECTION_REJECTED: 2,
+};
+
+function showToast(noti) {
+  const name = noti.payload.counterpartName;
+
+  if (noti.type === NOTIFICATION_TYPE.CONNECTION_ACCEPTED) {
+    toast.success(`${name}님이 연결 요청을 수락했습니다.`, {
+      onClick: () =&gt; navigate(`/collections/${noti.payload.connectionId}`),
+    });
+  } else {
+    toast.info(`${name}님이 연결 요청을 거절했습니다.`, {
+      onClick: () =&gt; navigate('/connections/sent'),
+    });
+  }
+}</code></pre>
+
+<div class="note">
+<p><strong>토스트는 SSE 이벤트 리스너에서만 호출한다.</strong> <code>syncFromServer()</code>에서
+호출하면 재연결될 때마다 과거 알림 20개가 한꺼번에 토스트로 쏟아진다.
+"실시간으로 방금 도착한 것"과 "목록에 있는 것"을 코드 경로로 분리하는 것이 요점이다.</p>
+</div>
+
+<h3 id="fe-consume">6.5 소비</h3>
+
+<pre><code>function NotificationBell() {
+  const { items, unread } = useNotifications();
+  return &lt;Badge count={unread}&gt;{/* 드롭다운에 items 렌더 */}&lt;/Badge&gt;;
+}</code></pre>
+
+<h3 id="fe-heartbeat">6.6 heartbeat 처리</h3>
+
+<p>
+서버가 20초마다 <code>event: ping</code>을 보낸다.
+<code>fetch-event-source</code>는 <strong>이벤트별 리스너가 없고 모든 프레임이 <code>onmessage</code> 하나로</strong>
+들어오므로, <strong>프론트에서 반드시 걸러야 한다.</strong>
+브라우저 내장 <code>EventSource</code>였다면 리스너가 없어 자동으로 버려졌겠지만 여기서는 아니다.
+</p>
+
+<pre><code>onmessage(ev) {
+  if (ev.event !== 'notification') return;   // ★ 이 줄이 없으면 ping 이 알림으로 처리된다
+  const noti = JSON.parse(ev.data);          // ping 의 data 는 '' → JSON.parse 에서 throw
+  ...
+}</code></pre>
+
+<div class="note">
+<p><strong>이 필터를 빠뜨리면 20초마다 <code>JSON.parse('')</code>가 예외를 던진다.</strong>
+<code>onmessage</code> 안에서 던진 예외는 <code>fetch-event-source</code>가 <code>onerror</code>로 넘기고,
+<code>onerror</code>가 숫자를 반환하면 재연결한다. 결과적으로 <strong>20초마다 커넥션이 재수립되는
+루프</strong>에 빠지는데, 화면상으로는 "가끔 알림이 늦게 온다" 정도로만 보여 원인을 찾기 어렵다.
+이벤트 이름으로 거르는 것을 <code>onmessage</code>의 첫 줄로 두는 이유다.</p>
+</div>
+
+<h4>선택: watchdog (초기 구현에서는 제외)</h4>
+
+<p>
+heartbeat를 더 적극적으로 쓴다면 용도는 하나 —
+<strong>서버 방향의 조용한 죽음을 감지하는 것</strong>이다.
+<a href="#flow-teardown">3.4</a>에서 다룬 문제의 거울상으로, 중간 방화벽이 커넥션을 조용히 끊거나
+서버가 비정상 종료되면 클라이언트도 즉시 알지 못한다.
+이벤트도 에러도 없는 상태로 몇 분간 죽어 있을 수 있고, 그동안 재연결은 발동하지 않는다.
+</p>
+
+<pre><code>let watchdog;
+const kick = () =&gt; {
+  clearTimeout(watchdog);
+  watchdog = setTimeout(() =&gt; {
+    ctrl.abort();                 // 강제로 끊고
+    setRetryKey((k) =&gt; k + 1);    // effect 재실행 → 재연결
+  }, 60_000);                     // heartbeat 20초 × 3회 누락
+};
+
+// onopen 과 onmessage(ping 포함) 양쪽에서 호출한다
+onmessage(ev) { kick(); if (ev.event !== 'notification') return; ... }</code></pre>
+
+<p>
+<strong>초기 구현에는 넣지 않는다.</strong> 클라이언트 쪽 네트워크가 끊기는 경우(와이파이 끔, 절전)는
+OS가 브라우저에 네트워크 변경을 알려 <code>onerror</code>가 즉시 발생하고 재연결된다.
+watchdog이 필요한 것은 그보다 드문 경우이고, 재연결 상태 관리가 붙으면서
+Provider가 눈에 띄게 복잡해지는 데 비해 얻는 것이 적다.
+운영 중 <strong>"알림이 안 오는데 새로고침하면 온다"</strong>는 제보가 나오면 그때 도입한다.
+</p>
+
+<h2 id="local">7. 로컬 개발 · 테스트</h2>
+
+<p>
+<strong>설계의 최대 위험 지점인 교차 인스턴스 전달까지 로컬에서 검증할 수 있다.</strong>
+<code>docker-compose.yml</code>과 <code>nginx/conf.d/default.conf</code>가 이미 있어
+nginx를 거친 경로도 확인 가능하다. 다만 몇 가지 사전 준비가 필요하다.
+</p>
+
+<h3 id="local-setup">7.1 사전 준비</h3>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th style="width:26%">항목</th><th style="width:36%">현재 상태</th><th style="width:38%">대응</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Redis</td>
+      <td><code>docker-compose.yml</code>에서 <code>expose: ["6379"]</code>만 —
+          <strong>호스트에 노출되지 않음</strong></td>
+      <td>로컬 개발용 Redis를 따로 기동 (아래 명령)</td>
+    </tr>
+    <tr>
+      <td>포트 충돌</td>
+      <td>Grafana가 <code>3000:3000</code>을 점유.
+          <code>main.ts:11</code>의 기본 포트도 3000</td>
+      <td><code>PORT</code> 환경변수로 3001 / 3002 사용</td>
+    </tr>
+    <tr>
+      <td>backend 이미지</td>
+      <td>compose가 <code>ghcr.io/…:latest</code>를 pull —
+          <strong>로컬 코드가 반영되지 않음</strong></td>
+      <td>백엔드는 <code>npm run start:dev</code>로 직접 기동</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<pre><code># 로컬 개발용 Redis (.env.example 기본값이 localhost:6379 라 그대로 붙는다)
+docker run -d -p 6379:6379 --name nodi-redis-dev redis:7-alpine</code></pre>
+
+<h3 id="local-levels">7.2 단계별 검증</h3>
+
+<h4>Level 1 — 백엔드 단독 (프론트 없이)</h4>
+
+<pre><code>curl -N -H "Authorization: Bearer &lt;액세스 토큰&gt;" http://localhost:3000/api/notifications/stream</code></pre>
+
+<p>
+<code>-N</code>이 curl 자체의 버퍼링을 끈다. 20초마다 <code>event: ping</code>이 찍히면 성공.
+<strong>5.3의 전역 인터셉터 문제가 여기서 바로 드러난다</strong> —
+<code>event:</code> 줄 없이 <code>data: {"status":200,…}</code>만 나오면 아직 수정되지 않은 것이다.
+</p>
+
+<h4>Level 2 — Vite + Nest 1대</h4>
+
+<p>
+기능 전체(연결 · 수신 · 토스트 · 뱃지 · 읽음 처리 · 로그아웃 정리)를 검증한다.
+Vite 프록시가 nginx 역할을 대신하므로 6.3 설정만 되어 있으면 된다.
+Chrome DevTools의 Network 탭에서 해당 요청을 선택하면 <strong>EventStream</strong> 탭에
+프레임이 실시간으로 쌓이는 것을 볼 수 있다.
+</p>
+
+<h4>Level 3 — 교차 인스턴스 전달 (가장 중요)</h4>
+
+<p>
+<code>main.ts:11</code>이 <code>process.env.PORT || 3000</code>이라 포트만 바꿔 두 개를 띄우면
+운영의 2-replica 상황을 그대로 재현할 수 있다.
+</p>
+
+<pre><code># 터미널 2개
+PORT=3001 npm run start:dev     # 인스턴스 A
+PORT=3002 npm run start:dev     # 인스턴스 B
+
+# A 에 SSE 연결
+curl -N -H "Authorization: Bearer &lt;요청자 토큰&gt;" http://localhost:3001/api/notifications/stream
+
+# B 로 수락 요청 (다른 터미널)
+curl -X PATCH -H "Authorization: Bearer &lt;수신자 토큰&gt;" \
+     http://localhost:3002/api/connection-requests/&lt;id&gt;/accept</code></pre>
+
+<p>
+<strong>첫 번째 curl에 이벤트가 나타나면 Redis Pub/Sub 교차 전달이 검증된 것이다.</strong>
+반대로 아무것도 안 나오면 5.4의 채널 구독 또는 발행 경로에 문제가 있다.
+인메모리 <code>Subject</code>만으로 구현했을 때 실패하는 것도 정확히 이 지점이다.
+</p>
+
+<h4>Level 4 — nginx 경유 (선택)</h4>
+
+<p>
+<code>proxy_buffering</code> 동작까지 확인하려면 nginx 컨테이너만 띄우고
+upstream을 호스트로 돌린다.
+</p>
+
+<pre><code># docker-compose.override.yml
+services:
+  nginx:
+    extra_hosts: ["host.docker.internal:host-gateway"]</code></pre>
+
+<pre><code>echo 'set $upstream host.docker.internal:3001;' &gt; nginx/active/upstream.conf
+docker compose up -d nginx
+curl -N http://localhost:8080/api/notifications/stream    # 8080:80 매핑</code></pre>
+
+<div class="note">
+<p><strong>검증 후 <code>nginx/active/upstream.conf</code>를 반드시 원래대로 되돌릴 것.</strong>
+이 파일은 배포 스크립트가 활성 색을 판단하는 기준이라
+<code>host.docker.internal</code>인 채로 커밋되면 배포가 깨진다.</p>
+</div>
+
+<h3 id="local-gaps">7.3 로컬에서 재현되지 않는 것</h3>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th style="width:30%">항목</th><th style="width:36%">이유</th><th style="width:34%">대응</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong><code>proxy_buffering</code> 지연</strong></td>
+      <td>Vite 프록시는 버퍼링하지 않아 Level 2까지는 항상 정상으로 보인다</td>
+      <td><strong>로컬 통과 → 프로덕션 실패의 전형</strong>.
+          Level 4 또는 스테이징에서 반드시 확인</td>
+    </tr>
+    <tr>
+      <td>비정상 단절 15분 회수</td>
+      <td>랜선을 뽑는 것 외에 재현 수단이 없다</td>
+      <td>검증 생략. 8장 관측으로 운영에서 확인</td>
+    </tr>
+    <tr>
+      <td>롤링 배포 중 재연결 폭주</td>
+      <td>단일 프로세스 환경에서는 의미가 없다</td>
+      <td>스테이징에서 blue-green 전환으로 확인</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="observability">8. 운영 관측</h2>
+
+<p>
+현재 모니터링 스택은 <strong>Alloy → Loki → Grafana, 즉 로그 전용</strong>이다
+(<code>provisioning/datasources/loki.yml</code>에 등록된 데이터소스도 Loki 하나뿐).
+Redis의 <code>PUBSUB CHANNELS</code>는 <em>물어봐야</em> 알 수 있는 값이라
+Redis 컨테이너 stdout에는 절대 찍히지 않는다.
+따라서 <strong>앱이 주기적으로 로그에 남기는 방식</strong>으로 관측한다.
+Loki가 로그에서 숫자를 뽑아 시계열로 만들 수 있으므로(<code>unwrap</code>)
+인프라 추가 없이 그래프와 알림이 모두 가능하다.
+</p>
+
+<h3 id="obs-logging">8.1 sse_stats 로깅 전략</h3>
+
+<h4>무엇을 찍는가</h4>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th style="width:22%">필드</th><th style="width:14%">출처</th><th style="width:64%">의미</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>evt</code></td><td>고정 문자열</td>
+      <td><code>"sse_stats"</code> — 라인 필터용 앵커. 이 값이 있어야 인덱스 단계에서 값싸게 걸러진다</td>
+    </tr>
+    <tr>
+      <td><code>localChannels</code></td><td>앱 메모리</td>
+      <td><code>this.channels.size</code> — <strong>이 인스턴스</strong>가 들고 있는 채널 수</td>
+    </tr>
+    <tr>
+      <td><code>redisChannels</code></td><td>Redis 질의</td>
+      <td><code>PUBSUB CHANNELS noti:*</code> 개수 — <strong>전체 인스턴스 합</strong></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+<strong>두 값을 함께 찍는 것이 이 전략의 핵심이다.</strong> 하나만으로는
+"커넥션이 많은 것"과 "구독이 새는 것"을 구분할 수 없다.
+</p>
+
+<h4>구현</h4>
+
+<p>
+채널 이름 패턴(<code>noti:*</code>)을 아는 것은 도메인 쪽이므로
+<code>module/notifications/notifications.service.ts</code>에 둔다.
+<code>lib</code>의 <code>RedisPubSubService</code>는 숫자를 세어줄 뿐이다(5.4).
+</p>
+
+<pre><code>@Injectable()
+export class NotificationsService implements OnModuleInit, OnModuleDestroy {
+  private statsTimer?: NodeJS.Timeout;
+
+  onModuleInit() {
+    // @nestjs/schedule 을 새로 추가하지 않기 위해 setInterval 사용
+    this.statsTimer = setInterval(() =&gt; void this.logStats(), 30_000);
+  }
+
+  private async logStats() {
+    try {
+      this.logger.info({
+        evt: 'sse_stats',
+        localChannels: this.pubsub.localChannelCount,           // 이 인스턴스
+        redisChannels: await this.pubsub.countChannels('noti:*'), // 전체 합
+      });
+    } catch (e) {
+      // 관측 실패가 서비스에 영향을 주면 안 된다
+      this.logger.warn({ evt: 'sse_stats_failed', err: String(e) });
+    }
+  }
+
+  onModuleDestroy() {
+    clearInterval(this.statsTimer);
+  }
+}</code></pre>
+
+<h4>설계 판단</h4>
+
+<ul>
+  <li><strong>주기 30초</strong> — 인스턴스당 하루 2,880줄. Loki 보존 14일 기준으로 부담이 없고,
+      커넥션 수는 급변하는 값이 아니라 이 해상도로 충분하다.</li>
+  <li><strong>인스턴스 식별은 하지 않아도 된다</strong> — Alloy가
+      <code>__meta_docker_container_name</code>을 <code>container</code> 라벨로 붙여주므로
+      (<code>be-nodi-backend_blue-1</code> / <code>-2</code>) replica가 자동 구분된다.
+      앱에서 <code>process.env.HOSTNAME</code>을 따로 넣을 필요가 없다.</li>
+  <li><strong><code>evt</code>를 라벨로 승격하지 않는다</strong> —
+      <code>config.alloy</code>의 <code>stage.labels</code>는 의도적으로 <code>level</code>만
+      올리고 있다. 라벨을 늘리면 카디널리티가 커져 Loki 인덱스가 나빠진다.
+      쿼리에서 <code>| json | evt="sse_stats"</code>로 거르는 것으로 충분하다.</li>
+  <li><strong>실패를 삼킨다</strong> — Redis 질의가 실패해도 알림 기능 자체는 정상 동작해야 한다.
+      5.5의 "알림 실패가 수락/거절을 롤백하지 않는다"와 같은 원칙이다.</li>
+  <li><strong>모든 인스턴스가 <code>redisChannels</code>를 조회한다</strong> —
+      값이 중복되지만 같은 값이라 무해하고, 특정 인스턴스만 조회하게 만드는 리더 선출은
+      얻는 것에 비해 복잡하다. 쿼리에서 <code>max()</code>로 집계한다.</li>
+</ul>
+
+<h3 id="obs-panels">8.2 Grafana 패널</h3>
+
+<p><strong>인스턴스별 활성 채널 수</strong></p>
+
+<pre><code>sum by (container) (
+  last_over_time(
+    {service=~"backend_.+"} |= "sse_stats" | json | unwrap localChannels [1m]
+  )
+)</code></pre>
+
+<p><strong>Redis 측 실제 채널 수</strong></p>
+
+<pre><code>max(
+  last_over_time(
+    {service=~"backend_.+"} |= "sse_stats" | json | unwrap redisChannels [1m]
+  )
+)</code></pre>
+
+<p>
+<code>|= "sse_stats"</code>를 <code>| json</code> <strong>앞</strong>에 두는 것이 중요하다.
+라인 필터가 인덱스 단계에서 먼저 걸러 JSON 파싱 비용을 크게 줄인다.
+기존 <code>rules.yml</code>의 nginx 5xx 규칙과 같은 패턴이다.
+</p>
+
+<p><strong>두 쿼리를 한 패널에 겹쳐 그린다.</strong> 벌어짐이 곧 진단이다.</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th style="width:44%">관측</th><th style="width:56%">해석</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>redisChannels</code> ≈ Σ <code>localChannels</code></td>
+      <td>정상</td>
+    </tr>
+    <tr>
+      <td><strong><code>redisChannels</code>만 단조 증가</strong></td>
+      <td><strong>5.3 <code>finalize()</code> 구독 해제 누락 — 코드 버그</strong></td>
+    </tr>
+    <tr>
+      <td>둘 다 접속자 수를 따라 오르내림</td>
+      <td>정상. 좀비 커넥션이 섞여 있어도 15분 내 회수된다 (3.4)</td>
+    </tr>
+    <tr>
+      <td>배포 후 <code>localChannels</code>가 0에서 회복되지 않음</td>
+      <td>재연결 실패 또는 nginx 설정 문제</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="obs-alert">8.3 알림 규칙</h3>
+
+<p>
+기존 <code>provisioning/alerting/rules.yml</code>의 구조를 그대로 따른다
+(LogQL 쿼리 A + threshold 표현식 B, <code>noDataState: OK</code>).
+</p>
+
+<pre><code>- uid: nodi-sse-channel-leak
+  title: SSE 구독 누수 의심
+  condition: B
+  noDataState: OK          # 트래픽 없는 시간대에 울리지 않도록
+  for: 30m                 # 일시적 스파이크가 아니라 지속 증가만 잡는다
+  labels:
+    severity: warning
+  annotations:
+    summary: 'Redis pub/sub 채널 {{ $values.A }}개 — finalize() 누수 확인 필요'
+    runbook: 'docker compose exec redis redis-cli PUBSUB CHANNELS "noti:*"'</code></pre>
+
+<p>
+임계값은 운영 초기 <strong>실제 동시 접속자 수를 관찰한 뒤</strong> 정한다.
+처음부터 숫자를 박으면 오탐이거나 무의미하다.
+<code>for: 30m</code>을 둔 이유는 비정상 단절 커넥션이 최대 15분간 남기 때문이다(3.4).
+그보다 짧게 잡으면 정상적인 회수 지연을 누수로 오인한다.
+</p>
+
+<h3 id="obs-prometheus">8.4 Prometheus를 지금 도입하지 않는 이유</h3>
+
+<p>
+정석은 Prometheus + <code>redis_exporter</code>다. <code>redis_pubsub_channels</code>가
+그냥 나오고, 메모리 · 이빅션 · 느린 명령까지 딸려온다.
+Alloy가 <code>prometheus.scrape</code>를 지원하므로 수집기는 재사용되고 저장소만 추가하면 된다.
+<strong>그럼에도 지금은 도입하지 않는다.</strong>
+</p>
+
+<h4>이유 1 — 필요한 것이 숫자 두 개뿐이다</h4>
+
+<p>
+알림 기능 하나를 붙이면서 관측 스택을 확장하는 것은 순서가 뒤바뀐 일이다.
+지금 보고 싶은 <code>localChannels</code> / <code>redisChannels</code>는 로그로 충분히 관측되고,
+컨테이너 2개(<code>prometheus</code>, <code>redis_exporter</code>) · 볼륨 · 보존 정책 ·
+메모리 300MB 내외가 그 대가로는 과하다.
+</p>
+
+<h4>이유 2 — 레이턴시는 이미 확보되어 있다</h4>
+
+<p>
+Prometheus 도입 근거로 가장 흔히 꼽히는 항목인데, 이 프로젝트는
+<code>nginx/conf.d/default.conf</code>의 <code>json_log</code>에
+<code>request_time</code> · <code>upstream_time</code>을 이미 남기고 있어 지금도 계산된다.
+</p>
+
+<pre><code>quantile_over_time(0.95, {service="nginx"} | json | unwrap request_time [5m])</code></pre>
+
+<h4>이유 3 — 남는 격차를 알고 감수한다</h4>
+
+<p>
+정직하게 말하면 로그 기반에는 구조적 한계가 있다. <strong>앱이 살아있어야 찍힌다는 점</strong>이다.
+앱이나 Redis가 죽으면 데이터 자체가 사라져 "값이 0"과 "관측 불능"이 구분되지 않는다.
+Prometheus라면 <code>up{job="redis"} == 0</code>으로 <em>죽었다는 사실</em>이 하나의 시계열이 되고,
+<code>redis_exporter</code>는 앱과 무관하게 Redis를 관측한다.
+</p>
+
+<p>
+지금은 이 격차를 <strong>기존 nginx 5xx 알림으로 간접 커버</strong>한다
+(<code>rules.yml</code>의 <code>nodi-nginx-5xx</code> — 백엔드 미도달 요청을 잡는다).
+완전하지는 않지만 현 규모에서는 실용적이다.
+</p>
+
+<h4>도입 트리거</h4>
+
+<p>아래 중 하나라도 해당되면 그때는 명확히 필요하다.</p>
+
+<ul>
+  <li>Redis를 캐시 · 리프레시 토큰 저장소로 더 쓰게 되어
+      <strong>메모리 압박이나 키 이빅션</strong>이 우려될 때 — 로그로는 관측 불가능하다</li>
+  <li>SSE 동시 커넥션이 <strong>수백 단위</strong>를 넘어갈 때 —
+      30초 로깅 해상도로는 스파이크를 놓친다</li>
+  <li><strong>서비스 생존 여부</strong>를 직접 감시해야 할 때</li>
+</ul>
+
+<h2 id="caveats">9. 주의사항</h2>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th style="width:14%">영역</th><th style="width:40%">이슈</th><th style="width:46%">대응</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="tag tag-fe">FE</span></td>
+      <td>훅을 여러 컴포넌트에서 호출하면 커넥션이 그만큼 열린다</td>
+      <td>Provider 1개로 강제. HTTP/1.1은 도메인당 동시 연결 6개 제한이라 일반 API가 대기에 밀린다</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fe">FE</span></td>
+      <td><strong>브라우저 내장 <code>EventSource</code>는 커스텀 헤더를 붙일 수 없다</strong></td>
+      <td>Bearer 헤더 인증이므로 <code>@microsoft/fetch-event-source</code>를 쓴다 (<a href="#fe-provider">6.1</a>)</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fe">FE</span></td>
+      <td>StrictMode에서 <code>useEffect</code>가 2회 실행 → 커넥션 2개</td>
+      <td>cleanup의 <code>es.close()</code>로 해소. 개발 환경 한정</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fe">FE</span></td>
+      <td>탭을 여러 개 열면 탭 수만큼 커넥션이 생긴다</td>
+      <td>정상 동작(모든 탭이 알림을 받음). 문제가 되면 <code>BroadcastChannel</code>로 리더 탭 선출을 검토</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fe">FE</span></td>
+      <td><code>onmessage</code>를 catch-all로 쓰면 heartbeat·미래 프레임이 섞여 들어온다</td>
+      <td><code>addEventListener('notification')</code>로 이벤트명을 명시 (<a href="#fe-heartbeat">6.6</a>)</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-be">BE</span></td>
+      <td><strong>전역 <code>TransformInterceptor</code>가 SSE 프레임을 감싸 <code>event:</code> 이름을 지운다</strong></td>
+      <td>구현 전 <code>APP_INTERCEPTOR</code> + <code>Reflector</code>로 SSE 라우트 예외 처리 (<a href="#be-controller">5.3</a>).
+          이 수정 없이는 기능 전체가 조용히 실패한다</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-be">BE</span></td>
+      <td><strong>heartbeat를 끄면 죽은 커넥션이 최대 2시간 남는다</strong></td>
+      <td>20초 주기 유지. 프록시 타임아웃 방지 + 재전송 타이머 트리거 이중 역할 (<a href="#flow-teardown">3.4</a>)</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-be">BE</span></td>
+      <td>비정상 단절 시 커넥션 회수에 약 15분이 걸린다</td>
+      <td>TCP 재전송 소진에 의존. <code>tcp_retries2</code>는 전역 설정이라 튜닝하지 않고 모니터링만 한다</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-be">BE</span></td>
+      <td><strong>인스턴스 2대 — 인메모리 전달로는 절반이 유실</strong></td>
+      <td>Redis Pub/Sub 필수. <a href="#local-levels">7.2 Level 3</a>에서 로컬 검증 가능</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-be">BE</span></td>
+      <td>커넥션 종료 시 Redis 구독을 해제하지 않으면 누수</td>
+      <td>RxJS <code>finalize</code>에서 정리. 배포 후 <code>PUBSUB CHANNELS</code> 수 확인</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-be">BE</span></td>
+      <td>알림 발행 실패가 수락/거절 API를 실패시킴</td>
+      <td>트랜잭션 밖 호출 + 예외 삼키고 로깅. DB 저장이 진실의 원천</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-be">BE</span></td>
+      <td>재배포 시 전체 커넥션이 동시에 끊겨 재연결이 몰린다</td>
+      <td>롤링 배포로 인스턴스를 번갈아 교체. 2대이므로 한 번에 1대씩</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-infra">INFRA</span></td>
+      <td><code>proxy_buffering</code> 기본값이 이벤트를 지연시킨다</td>
+      <td>해당 location만 <code>off</code> (<a href="#be-nginx">5.6</a>)</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="future">10. 확장: Web Push</h2>
+
+<p>
+브라우저가 닫힌 상태에서도 수락/거절 결과를 알려야 한다면
+<strong>SSE를 대체하지 않고 병행</strong>한다. 탭이 열려 있으면 SSE, 닫혀 있으면 Web Push가 표준 조합이다.
+</p>
+
+<ul>
+  <li><span class="tag tag-be">BE</span> <code>web-push</code> + VAPID 키. <code>PushSubscription</code> 테이블 (<code>endpoint</code> unique, <code>p256dh</code>, <code>auth</code>, <code>userId</code>) — 사용자 : 구독 = 1 : N</li>
+  <li><span class="tag tag-be">BE</span> 발송은 BullMQ + Redis 큐로 비동기 처리</li>
+  <li><span class="tag tag-be">BE</span> 응답 <code>410 Gone</code> / <code>404</code> 시 구독 레코드 삭제. 방치하면 몇 달 뒤 발송의 상당수가 무효가 된다</li>
+  <li><span class="tag tag-fe">FE</span> <code>public/sw.js</code>에 두면 Vite가 <strong>루트 경로</strong>로 서빙한다. 권한 요청 UX와 구독 등록/해지 토글 필요</li>
+  <li>페이로드 상한 약 4KB(안전선 3KB). 큰 데이터는 ID만 보내고 Service Worker에서 fetch</li>
+  <li><strong>iOS Safari는 사용자가 홈 화면에 추가해 PWA로 설치해야만 동작한다.</strong> OS 제약이라 우회 불가 — iOS 비중이 크면 설치 유도 동선을 함께 설계해야 한다</li>
+</ul>
+
+<h2 id="checklist">11. 작업 체크리스트</h2>
+
+<h3>선행 작업 <span class="tag tag-be">차단 요소</span></h3>
+<ul class="checklist">
+  <li><strong><code>TransformInterceptor</code>를 <code>APP_INTERCEPTOR</code>로 전환하고 SSE 라우트 예외 처리</strong> (<a href="#be-controller">5.3</a>) — 이것부터 하지 않으면 이후 검증이 모두 무의미하다</li>
+  <li>로컬 개발용 Redis 기동 + <code>PORT</code> 분리 확인 (<a href="#local-setup">7.1</a>)</li>
+</ul>
+
+<h3><span class="tag tag-be">BACKEND</span></h3>
+<ul class="checklist">
+  <li>Prisma <code>Notification</code> 모델 추가 + <code>User</code>에 역관계 필드 + 마이그레이션</li>
+  <li><code>NotificationType</code> const 객체 (기존 <code>ConnectionRequestStatus</code> 패턴 준수)</li>
+  <li><code>lib/redis/redis-pubsub.service.ts</code> 신설 — 커넥션 분리, <code>error</code> 핸들러, <code>finalize</code> 구독 정리</li>
+  <li><code>lib/redis/redis.config.ts</code>로 연결 옵션 추출 (기존 <code>RedisService</code>와 공유)</li>
+  <li><code>module/notifications/</code> — controller · service · repository · module (<a href="#be-layout">5.1</a>)</li>
+  <li><code>@Sse('stream')</code> 엔드포인트 + <code>@Auth(UserRole.ADMIN, UserRole.USER)</code> + 20초 heartbeat</li>
+  <li><code>takeUntil(timer(30분))</code>으로 스트림 수명 제한 → 주기적 재인증 (<a href="#be-controller">5.3</a>)</li>
+  <li>목록 / 읽음 처리 / 전체 읽음 API</li>
+  <li><code>acceptRequest()</code> · <code>rejectRequest()</code>에 알림 생성 후킹 (트랜잭션 밖)</li>
+  <li>nginx location 블록 추가 — <code>location /</code>보다 <strong>위에</strong> 배치 (<a href="#be-nginx">5.6</a>)</li>
+  <li><code>sse_stats</code> 30초 주기 로깅 (<code>localChannels</code> + <code>redisChannels</code>, <code>pub</code> 커넥션 사용)</li>
+</ul>
+
+<h3><span class="tag tag-infra">관측</span></h3>
+<ul class="checklist">
+  <li>Grafana 패널 — <code>localChannels</code>(인스턴스별) + <code>redisChannels</code>(전체) 겹쳐 그리기 (<a href="#obs-panels">8.2</a>)</li>
+  <li><code>rules.yml</code>에 <code>nodi-sse-channel-leak</code> 규칙 추가 (<code>for: 30m</code>, 임계값은 운영 관찰 후 결정)</li>
+  <li>Prometheus는 도입하지 않음 — 근거와 트리거는 <a href="#obs-prometheus">8.4</a></li>
+</ul>
+
+<h3><span class="tag tag-fe">FRONTEND</span></h3>
+<ul class="checklist">
+  <li><code>npm i @microsoft/fetch-event-source</code></li>
+  <li><code>NotificationContext.jsx</code> — 연결 · <code>AbortController</code> 정리 · 중복 방지 · <code>onopen</code> 보정</li>
+  <li><code>onmessage</code> 첫 줄에 <code>ev.event !== 'notification'</code> 필터 (<a href="#fe-heartbeat">6.6</a>)</li>
+  <li><code>openWhenHidden: true</code> — 백그라운드 탭에서도 유지</li>
+  <li>401 → 토큰 갱신 후 <code>retryKey</code> 증가로 재연결</li>
+  <li><code>AuthProvider</code> 안 / Router 바깥에 배치</li>
+  <li><code>vite.config.js</code>에 <code>/api</code> 프록시 설정</li>
+  <li>목록 · 읽음 처리 API 클라이언트</li>
+  <li>벨 아이콘 뱃지 + 드롭다운 목록</li>
+  <li>토스트 2종 (수락 / 거절) + 클릭 시 라우팅</li>
+  <li>로그아웃 시 상태 초기화 검증</li>
+</ul>
+
+<h3>공통 검증</h3>
+<ul class="checklist">
+  <li><strong>Level 1</strong> — <code>curl -N</code>로 <code>event: ping</code> 확인. <code>event:</code> 줄이 없으면 인터셉터 미수정 (<a href="#local-levels">7.2</a>)</li>
+  <li><strong>Level 3 교차 인스턴스</strong> — 3001에 연결, 3002로 수락 요청 → 알림 도달 (이 설계의 최대 위험 지점)</li>
+  <li><strong>Level 4 nginx 경유</strong> — <code>proxy_buffering</code> 확인. <strong>로컬에서만 통과하고 프로덕션에서 실패하는 유일한 항목</strong></li>
+  <li>네트워크 강제 차단 후 재연결 및 누락 보정 확인</li>
+  <li>재연결 시 과거 알림이 토스트로 쏟아지지 않는지 확인</li>
+  <li>탭 여러 개에서 모두 수신되는지 확인 + <strong>백그라운드 탭에서도</strong> 수신되는지 확인</li>
+  <li>액세스 토큰 만료 시점을 넘겨 스트림이 재인증되는지 확인 (30분 상한)</li>
+  <li>Redis 중단 상태에서 수락/거절 API가 정상 동작하는지 확인 (알림만 유실)</li>
+  <li>검증 후 <code>nginx/active/upstream.conf</code> 원복 확인 — 배포 스크립트가 읽는 파일</li>
+</ul>
+
+</main>
+</div>
+
+<script>
+  // 스크롤 위치에 따라 목차 항목 하이라이트
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+    var sections = links
+      .map(function (a) {
+        return { link: a, el: document.getElementById(a.getAttribute('href').slice(1)) };
+      })
+      .filter(function (s) { return s.el; });
+
+    var current = null;
+    var ticking = false;
+
+    function update() {
+      ticking = false;
+      var offset = 100;
+      var active = sections[0];
+      for (var i = 0; i < sections.length; i++) {
+        if (sections[i].el.getBoundingClientRect().top <= offset) active = sections[i];
+      }
+      // 문서 최하단에서는 마지막 항목을 활성화
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 4) {
+        active = sections[sections.length - 1];
+      }
+      if (active === current) return;
+      if (current) current.link.classList.remove('active');
+      active.link.classList.add('active');
+      current = active;
+    }
+
+    window.addEventListener('scroll', function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  })();
+</script>
+
+</body>
+</html>
