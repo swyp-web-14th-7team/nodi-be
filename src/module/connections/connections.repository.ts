@@ -144,8 +144,8 @@ export class ConnectionsRepository {
       CardConnectionRequest,
       'id' | 'requesterCardId' | 'receiverCardId' | 'message'
     >,
-  ): Promise<void> {
-    await this.prismaService.$transaction(async (tx) => {
+  ): Promise<CardConnection> {
+    return this.prismaService.$transaction(async (tx) => {
       const [requesterCard, receiverCard] = await Promise.all([
         tx.userProfileCard.findUniqueOrThrow({
           where: { id: request.requesterCardId },
@@ -165,7 +165,7 @@ export class ConnectionsRepository {
         },
       });
 
-      await tx.cardConnection.create({
+      return tx.cardConnection.create({
         data: {
           requesterUserId: requesterCard.userId,
           receiverUserId: receiverCard.userId,

@@ -8,16 +8,24 @@ import {
 import { map, Observable } from 'rxjs';
 import { ResponseSuccess } from '@/common/type/response-success.type';
 import { type Response } from 'express';
+import { Reflector } from '@nestjs/core';
+import { SSE_METADATA } from '@nestjs/common/constants';
 
 @Injectable()
 export class TransformInterceptor<T> implements NestInterceptor<
   T,
-  ResponseSuccess<T>
+  ResponseSuccess<T> | T
 > {
+  constructor(private readonly reflector: Reflector) {}
+
   intercept(
     context: ExecutionContext,
     next: CallHandler<T>,
-  ): Observable<ResponseSuccess<T>> {
+  ): Observable<ResponseSuccess<T> | T> {
+    if (this.reflector.get<boolean>(SSE_METADATA, context.getHandler())) {
+      return next.handle();
+    }
+
     const res = context.switchToHttp().getResponse<Response>();
     return next.handle().pipe(
       map((data: T): ResponseSuccess<T> => {

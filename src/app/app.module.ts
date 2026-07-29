@@ -19,6 +19,9 @@ import { PurposesModule } from '@/module/purposes/purposes.module';
 import { CollectionsModule } from '@/module/collections/collections.module';
 import { ConnectionsModule } from '@/module/connections/connections.module';
 import { CardBackgroundImagesModule } from '@/module/card-background-images/card-background-images.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { TransformInterceptor } from '@/common/interceptor/transform.interceptor';
+import { NotificationsModule } from '@/module/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -41,8 +44,12 @@ import { CardBackgroundImagesModule } from '@/module/card-background-images/card
     CollectionsModule,
     ConnectionsModule,
     CardBackgroundImagesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
+  ],
 })
 export class AppModule {}
