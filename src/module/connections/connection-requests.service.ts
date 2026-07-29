@@ -16,10 +16,19 @@ import {
   SentConnectionRequest,
 } from '@/module/connections/connection-request.type';
 import { ConnectionRequestStatus } from '@/module/connections/type/connection-request-status.enum';
+import { NotificationsService } from '@/module/notifications/notifications.service';
+import { NotificationType } from '@/module/notifications/type/notification-type.enum';
+import { PinoLogger } from 'nestjs-pino';
 
 @Injectable()
 export class ConnectionRequestsService {
-  constructor(private readonly connectionsRepository: ConnectionsRepository) {}
+  constructor(
+    private readonly connectionsRepository: ConnectionsRepository,
+    private readonly notificationsService: NotificationsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(ConnectionRequestsService.name);
+  }
 
   /** 연결 요청 보내기 */
   async createRequest(
@@ -107,7 +116,17 @@ export class ConnectionRequestsService {
   async acceptRequest(user: User, id: string): Promise<void> {
     const request = await this.getPendingRequestAsReceiver(user, id);
     try {
-      await this.connectionsRepository.acceptRequest(request);
+      const connection =
+        await this.connectionsRepository.acceptRequest(request);
+      await this.createNotificationSafely(request.requesterCard.userId, {
+        type: NotificationType.CONNECTION_ACCEPTED,
+        payload: {
+          requestId: request.id,
+          connectionId: connection.id,
+          counterpartCardId: request.receiverCardId,
+          counterpartName: request.receiverCard.nickname,
+        },
+      });
     } catch (e) {
       // 동시 수락 등으로 이미 연결이 존재하는 경우
       if (this.isUniqueConflict(e)) {
@@ -124,6 +143,14 @@ export class ConnectionRequestsService {
       request.id,
       ConnectionRequestStatus.REJECTED,
     );
+    await this.createNotificationSafely(request.requesterCard.userId, {
+      type: NotificationType.CONNECTION_REJECTED,
+      payload: {
+        requestId: request.id,
+        counterpartCardId: request.receiverCardId,
+        counterpartName: request.receiverCard.nickname,
+      },
+    });
   }
 
   /** 요청 취소 (보낸 사람만) */
@@ -179,5 +206,19 @@ export class ConnectionRequestsService {
     return (
       typeof e === 'object' && e !== null && 'code' in e && e.code === 'P2002'
     );
+  }
+
+  private async createNotificationSafely(
+    userId: string,
+    input: Parameters<NotificationsService['create']>[1],
+  ): Promise<void> {
+    try {
+      await this.notificationsService.create(userId, input);
+    } catch (e) {
+      this.logger.warn(
+        { userId, requestId: input.payload.requestId, err: String(e) },
+        'notification_create_failed',
+      );
+    }
   }
 }

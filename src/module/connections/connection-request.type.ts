@@ -21,8 +21,8 @@ export type SentConnectionRequest = Prisma.CardConnectionRequestGetPayload<{
 
 // 권한 확인용: 양쪽 카드의 소유자(userId) 만 포함
 export const requestPartiesIncludeOptions = {
-  requesterCard: { select: { userId: true } },
-  receiverCard: { select: { userId: true } },
+  requesterCard: { select: { userId: true, nickname: true } },
+  receiverCard: { select: { userId: true, nickname: true } },
 } satisfies Prisma.CardConnectionRequestInclude;
 
 export type ConnectionRequestWithParties =

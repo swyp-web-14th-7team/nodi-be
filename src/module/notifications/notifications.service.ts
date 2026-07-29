@@ -1,10 +1,12 @@
-import { Injectable, MessageEvent } from '@nestjs/common';
+import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common';
 import { RedisPubsubService } from '@/lib/redis/redis-pubsub.service';
 import { NotificationsRepository } from '@/module/notifications/notifications.repository';
 import { map, Observable } from 'rxjs';
 import { CreateNotificationInput } from '@/module/notifications/type/notification-type.enum';
 import { PinoLogger } from 'nestjs-pino';
 import { Notification } from '@/prisma/client';
+import { FindAllNotificationsDto } from '@/module/notifications/dto/find-all-notifications.dto';
+import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
 export class NotificationsService {
@@ -51,5 +53,22 @@ export class NotificationsService {
       );
     }
     return noti;
+  }
+
+  async findAll(
+    userId: string,
+    dto: FindAllNotificationsDto,
+  ): Promise<PaginationResult<Notification>> {
+    return this.notificationRepository.findAll(userId, dto);
+  }
+
+  async checkRead(id: string, userId: string) {
+    const target: Notification | null =
+      await this.notificationRepository.findOneById(id);
+    if (!target || target.userId !== userId)
+      throw new NotFoundException('알림을 찾을 수 없습니다.');
+
+    if (target.readAt === null)
+      await this.notificationRepository.update(id, { readAt: new Date() });
   }
 }

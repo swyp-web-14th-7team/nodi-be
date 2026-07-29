@@ -13,5 +13,6 @@ import { LoggerModule } from '@/lib/logger/logger.module';
   imports: [RedisModule, UsersModule, LoggerModule],
   providers: [NotificationsService, NotificationsRepository],
   controllers: [NotificationsController],
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}

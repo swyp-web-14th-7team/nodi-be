@@ -5,7 +5,7 @@ import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
 import { Experience } from '@/prisma/client';
 import { PROFILE_CARD_LINK_TYPE_DESCRIPTION } from '@/module/profile-cards/type/profile-card-link-type.enum';
 
-export class PersonalityResponse {
+export class ProfileCardPersonalityResponse {
   @ApiProperty()
   id: number;
 
@@ -16,7 +16,7 @@ export class PersonalityResponse {
   imageUrl: string | null;
 }
 
-export class AffiliationStatusResponse {
+export class ProfileCardAffiliationStatusResponse {
   @ApiProperty()
   id: number;
 
@@ -24,7 +24,7 @@ export class AffiliationStatusResponse {
   name: string;
 }
 
-export class PurposeResponse {
+export class ProfileCardPurposeResponse {
   @ApiProperty()
   id: number;
 
@@ -108,14 +108,17 @@ export class ProfileCardResponse {
   @ApiPropertyOptional()
   interests?: ProfileCardInterestResponse[];
 
-  @ApiPropertyOptional({ type: PersonalityResponse, nullable: true })
-  personality?: PersonalityResponse | null;
+  @ApiPropertyOptional({ type: ProfileCardPersonalityResponse, nullable: true })
+  personality?: ProfileCardPersonalityResponse | null;
 
-  @ApiPropertyOptional({ type: AffiliationStatusResponse, nullable: true })
-  affiliationStatus?: AffiliationStatusResponse | null;
+  @ApiPropertyOptional({
+    type: ProfileCardAffiliationStatusResponse,
+    nullable: true,
+  })
+  affiliationStatus?: ProfileCardAffiliationStatusResponse | null;
 
-  @ApiPropertyOptional({ type: PurposeResponse, nullable: true })
-  purpose?: PurposeResponse | null;
+  @ApiPropertyOptional({ type: ProfileCardPurposeResponse, nullable: true })
+  purpose?: ProfileCardPurposeResponse | null;
 
   @ApiPropertyOptional({ nullable: true, description: '기반 템플릿 직군 이름' })
   jobTypeName?: string | null;
