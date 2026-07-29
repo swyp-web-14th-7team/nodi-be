@@ -135,13 +135,37 @@ npm run start:dev
 
 ### 이미지 빌드 (CI)
 `main` 브랜치에 push(=PR 머지)되면 GitHub Actions가 **linux/arm64** 이미지를 빌드해
-GHCR(`ghcr.io/swyp-web-14th-7team/nodi-be`)에 푸시합니다. (`.github/workflows/build-image.yml`)
+GHCR(`ghcr.io/swyp-web-14th-7team/nodi-be`)에 푸시한 뒤 운영 서버에 SSH로 접속해
+이미지를 pull하고 Blue-Green 배포 스크립트를 실행합니다. (`.github/workflows/build-image.yml`)
 
 - 빌드 전 `package.json`의 `version` 태그가 GHCR에 이미 있으면 **실패**시켜 버전 누락을 방지합니다.
   → 배포마다 `package.json` 버전을 올려야 합니다.
 - 태그: `latest`, 커밋 SHA(불변 핀), `v<version>`(릴리스 식별).
 - 멀티스테이지 `Dockerfile`(node:22-alpine)로 빌드 후 dev 의존성을 제거한 런타임 이미지를 생성하며,
   `/health` 기반 `HEALTHCHECK`를 포함합니다.
+
+### GitHub Actions 배포 Secrets
+
+`production` environment 또는 Repository Actions secrets에 아래 값을 등록해야 합니다.
+
+| Secret | 설명 |
+| --- | --- |
+| `PROD_SSH_HOST` | 운영 서버 IP 또는 도메인 |
+| `PROD_SSH_PORT` | SSH 포트(일반적으로 `22`) |
+| `PROD_SSH_USER` | SSH 사용자(예: `ubuntu`) |
+| `PROD_SSH_PRIVATE_KEY` | 운영 서버 접속용 개인키 전체 |
+| `PROD_SSH_FINGERPRINT` | 운영 서버 SSH host key fingerprint |
+
+민감하지 않은 값은 `production` environment 또는 Repository Actions variables에 등록합니다.
+
+| Variable | 설명 |
+| --- | --- |
+| `PROD_DEPLOY_PATH` | 서버의 배포 루트 절대경로(예: `/home/ubuntu/nodi-be`) |
+| `GHCR_IMAGE` | 태그를 제외한 이미지 경로(예: `ghcr.io/swyp-web-14th-7team/nodi-be`) |
+
+SSH 사용자는 `docker` 명령을 실행할 권한이 있어야 하며, private GHCR 이미지를 받을 수 있도록
+서버에서 `docker login ghcr.io`가 미리 완료되어 있어야 합니다. 배포 job은 현재 커밋의
+`scripts/deploy.sh`를 `${PROD_DEPLOY_PATH}/scripts/deploy.sh`에 덮어쓴 뒤 해당 절대경로로 실행합니다.
 
 ### 무중단 배포 (Blue-Green)
 운영 서버는 `docker-compose.yml` + nginx로 **Blue-Green 무중단 배포**를 합니다.

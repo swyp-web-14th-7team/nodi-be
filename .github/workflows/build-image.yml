@@ -6,10 +6,11 @@ on:
     branches: [main]
   workflow_dispatch: # 필요 시 수동 실행
 
-# 같은 브랜치에서 새 push 오면 진행 중인 빌드는 취소
+# 배포 도중 새 push 로 workflow 가 취소되면 blue-green 전환이 중간에 끊길 수 있다.
+# 같은 브랜치의 실행은 취소하지 않고 순서대로 대기시킨다.
 concurrency:
-  group: build-image-${{ github.ref }}
-  cancel-in-progress: true
+  group: build-and-deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
@@ -107,3 +108,49 @@ jobs:
           # GitHub Actions 캐시로 레이어 재사용 → 빌드 속도 향상
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ── 3) 운영 서버 배포 ──────────────────────────────────
+  # 이미지 push 가 끝난 뒤 SSH 로 운영 서버에 접속해 이미지를 받고 배포 스크립트를 실행한다.
+  deploy:
+    needs: [check-version, build-and-push]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+
+    steps:
+      # build job 과 runner 가 다르므로 SCP 로 보낼 파일을 다시 checkout 한다.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 서버의 <PROD_DEPLOY_PATH>/scripts/deploy.sh 를 현재 커밋 버전으로 덮어쓴다.
+      # scripts/ 경로를 유지해야 deploy.sh 내부의 프로젝트 루트 이동(cd ..)이 정상 동작한다.
+      - name: Copy deploy script
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          port: ${{ secrets.PROD_SSH_PORT }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
+          source: scripts/deploy.sh
+          target: ${{ vars.PROD_DEPLOY_PATH }}
+          overwrite: true
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
+          GHCR_IMAGE: ${{ vars.GHCR_IMAGE }}
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          port: ${{ secrets.PROD_SSH_PORT }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
+          envs: DEPLOY_PATH,GHCR_IMAGE
+          script: |
+            set -euo pipefail
+            docker pull "${GHCR_IMAGE}:latest"
+            "${DEPLOY_PATH}/scripts/deploy.sh"
+            docker image prune -f
