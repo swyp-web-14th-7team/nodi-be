@@ -165,7 +165,8 @@ GHCR(`ghcr.io/swyp-web-14th-7team/nodi-be`)에 푸시한 뒤 운영 서버에 SS
 
 SSH 사용자는 `docker` 명령을 실행할 권한이 있어야 하며, private GHCR 이미지를 받을 수 있도록
 서버에서 `docker login ghcr.io`가 미리 완료되어 있어야 합니다. 배포 job은 현재 커밋의
-`scripts/deploy.sh`를 `${PROD_DEPLOY_PATH}/scripts/deploy.sh`에 덮어쓴 뒤 해당 절대경로로 실행합니다.
+`scripts/deploy.sh`와 `nginx/conf.d/default.conf`를 배포 경로에 덮어쓴 뒤 스크립트를 실행합니다.
+현재 활성 색을 저장하는 `nginx/active/upstream.conf`는 기존 값을 보존하고, 없을 때만 blue로 초기화합니다.
 
 ### 무중단 배포 (Blue-Green)
 운영 서버는 `docker-compose.yml` + nginx로 **Blue-Green 무중단 배포**를 합니다.
