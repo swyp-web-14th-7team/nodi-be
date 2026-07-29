@@ -135,7 +135,7 @@ jobs:
           umask 077
           printf '%s\n' "$PROD_ENV_FILE" > .env.deploy
 
-      # Compose·실행 스크립트·정적 nginx 설정을 현재 커밋 버전으로 덮어쓴다.
+      # Compose·실행 스크립트·정적 nginx/monitoring 설정을 현재 커밋 버전으로 덮어쓴다.
       # nginx/active/upstream.conf 는 현재 활성 색 상태이므로 SCP 대상에 넣지 않는다.
       - name: Copy deployment files
         uses: appleboy/scp-action@v1
@@ -145,7 +145,7 @@ jobs:
           username: ${{ secrets.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
           fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
-          source: docker-compose.yml,.env.deploy,scripts/deploy.sh,nginx/conf.d/default.conf
+          source: docker-compose.yml,.env.deploy,scripts/deploy.sh,nginx/conf.d/default.conf,monitoring
           target: ${{ vars.PROD_DEPLOY_PATH }}
           overwrite: true
 

@@ -166,7 +166,7 @@ GHCR(`ghcr.io/swyp-web-14th-7team/nodi-be`)에 푸시한 뒤 운영 서버에 SS
 
 SSH 사용자는 `docker` 명령을 실행할 권한이 있어야 하며, private GHCR 이미지를 받을 수 있도록
 서버에서 `docker login ghcr.io`가 미리 완료되어 있어야 합니다. 배포 job은 현재 커밋의
-`docker-compose.yml`, `scripts/deploy.sh`, `nginx/conf.d/default.conf`를 배포 경로에 덮어씁니다.
+`docker-compose.yml`, `scripts/deploy.sh`, `nginx/conf.d/default.conf`, `monitoring/`을 배포 경로에 덮어씁니다.
 `PROD_ENV_FILE` Secret은 runner에서 `.env.deploy`로 만든 뒤 권한을 `600`으로 제한해 함께 배포합니다.
 현재 활성 색을 저장하는 `nginx/active/upstream.conf`는 기존 값을 보존하고, 없을 때만 blue로 초기화합니다.
 
@@ -180,6 +180,7 @@ docker compose pull          # ★ 먼저 GHCR에서 새 이미지를 받아둘 
 
 `scripts/deploy.sh` 흐름:
 
+0. 실행 중인 nginx가 없으면 최초 기동으로 판단해 전체 stack을 `docker compose up -d`로 blue에 기동
 1. 현재 활성 색 파악 (`nginx/active/upstream.conf`)
 2. 반대 색을 새 이미지로 기동
 3. 새 색 **헬스체크** — 모든 replica가 healthy가 될 때까지 (실패 시 배포 취소, 현재 색 무사)
