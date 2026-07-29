@@ -123,7 +123,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 실행 스크립트와 정적 nginx 설정만 현재 커밋 버전으로 덮어쓴다.
+      # 운영 환경변수는 저장소에 두지 않고 production Environment Secret으로 파일을 만든다.
+      - name: Create deployment environment file
+        env:
+          PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+        run: |
+          if [ -z "$PROD_ENV_FILE" ]; then
+            echo "::error::production Environment Secret PROD_ENV_FILE 이 비어 있습니다."
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$PROD_ENV_FILE" > .env.deploy
+
+      # Compose·실행 스크립트·정적 nginx 설정을 현재 커밋 버전으로 덮어쓴다.
       # nginx/active/upstream.conf 는 현재 활성 색 상태이므로 SCP 대상에 넣지 않는다.
       - name: Copy deployment files
         uses: appleboy/scp-action@v1
@@ -133,7 +145,7 @@ jobs:
           username: ${{ secrets.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
           fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
-          source: scripts/deploy.sh,nginx/conf.d/default.conf
+          source: docker-compose.yml,.env.deploy,scripts/deploy.sh,nginx/conf.d/default.conf
           target: ${{ vars.PROD_DEPLOY_PATH }}
           overwrite: true
 
@@ -151,6 +163,7 @@ jobs:
           envs: DEPLOY_PATH,GHCR_IMAGE
           script: |
             set -euo pipefail
+            chmod 600 "${DEPLOY_PATH}/.env.deploy"
             mkdir -p "${DEPLOY_PATH}/nginx/active"
             if [ ! -f "${DEPLOY_PATH}/nginx/active/upstream.conf" ]; then
               printf '%s\n' 'set $upstream backend_blue:3000;' > "${DEPLOY_PATH}/nginx/active/upstream.conf"
