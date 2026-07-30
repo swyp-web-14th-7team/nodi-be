@@ -19,6 +19,18 @@ export type SentConnectionRequest = Prisma.CardConnectionRequestGetPayload<{
   include: typeof sentRequestIncludeOptions;
 }>;
 
+// 카드 확인용: 소유자·활성 여부 + 알림 문구에 쓰는 닉네임
+export const cardOwnershipSelectOptions = {
+  id: true,
+  userId: true,
+  isActive: true,
+  nickname: true,
+} satisfies Prisma.UserProfileCardSelect;
+
+export type CardOwnership = Prisma.UserProfileCardGetPayload<{
+  select: typeof cardOwnershipSelectOptions;
+}>;
+
 // 권한 확인용: 양쪽 카드의 소유자(userId) 만 포함
 export const requestPartiesIncludeOptions = {
   requesterCard: { select: { userId: true, nickname: true } },

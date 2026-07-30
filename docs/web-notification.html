@@ -212,9 +212,10 @@
     <li><a href="#flow">3. 연동 흐름</a>
       <ul class="sub">
         <li><a href="#flow-main">3.1 수락 → 알림 도달</a></li>
-        <li><a href="#flow-reconnect">3.2 재연결</a></li>
-        <li><a href="#flow-logout">3.3 로그아웃</a></li>
-        <li><a href="#flow-teardown">3.4 커넥션 회수</a></li>
+        <li><a href="#flow-request">3.2 요청 도착 → 알림 도달</a></li>
+        <li><a href="#flow-reconnect">3.3 재연결</a></li>
+        <li><a href="#flow-logout">3.4 로그아웃</a></li>
+        <li><a href="#flow-teardown">3.5 커넥션 회수</a></li>
       </ul>
     </li>
     <li><a href="#api">4. API 명세</a>
@@ -267,9 +268,9 @@
 <main>
 
 <h1>nodi 실시간 알림 설계 문서</h1>
-<p class="subtitle">연결 요청 수락 · 거절 알림의 실시간 전달(SSE) 구현 현황 — 프론트엔드 · 백엔드 역할 분리</p>
+<p class="subtitle">연결 요청 수신 · 수락 · 거절 알림의 실시간 전달(SSE) 구현 현황 — 프론트엔드 · 백엔드 역할 분리</p>
 <p class="meta">
-  작성일 2026-07-29 · 구현 반영 2026-07-30 ·
+  작성일 2026-07-29 · 구현 반영 2026-07-30 · 요청 수신 알림 설계 추가 2026-07-30 ·
   백엔드 nodi-be (NestJS 11 / Prisma 7 / MariaDB / Redis / nginx, <strong>인스턴스 2대</strong>) ·
   프론트엔드 Vite + React (JavaScript)
 </p>
@@ -277,17 +278,19 @@
 <h2 id="overview">1. 개요</h2>
 
 <p>
-사용자가 서비스를 <strong>사용 중일 때</strong> 자신이 보낸 연결 요청의 처리 결과를
-새로고침 없이 즉시 전달한다. 브라우저가 닫힌 상태에서의 전달(Web Push)은
+사용자가 서비스를 <strong>사용 중일 때</strong> 자신에게 도착한 연결 요청과
+자신이 보낸 연결 요청의 처리 결과를 새로고침 없이 즉시 전달한다.
+브라우저가 닫힌 상태에서의 전달(Web Push)은
 <a href="#future">10장</a>에서 확장 계획으로만 다룬다.
 </p>
 
 <h3 id="events">1.1 알림 대상 이벤트</h3>
 
 <p>
-현재 범위의 알림은 <strong>두 가지뿐이다.</strong> 두 경우 모두
-<code>CardConnectionRequest</code>의 <strong>요청자</strong>(<code>requesterCard.userId</code>)에게 전달된다.
-수신자(응답한 사람)에게는 알림을 보내지 않는다. 본인이 방금 누른 행동이기 때문이다.
+현재 범위의 알림은 <strong>세 가지다.</strong> 모두 <code>CardConnectionRequest</code> 한 건을 축으로 하되
+<strong>수신자 방향이 갈린다</strong> — 요청 <em>결과</em>(수락 · 거절)는 요청자에게 가고,
+요청 <em>도착</em>은 요청을 받은 사람에게 간다.
+<strong>어느 경우든 그 행동을 방금 누른 본인에게는 알림을 보내지 않는다.</strong>
 </p>
 
 <div class="scroll">
@@ -299,16 +302,24 @@
     <tr>
       <td><code>CONNECTION_ACCEPTED</code> (1)</td>
       <td><code>ConnectionRequestsService.acceptRequest()</code></td>
-      <td>요청자</td>
+      <td>요청자 <code>requesterCard.userId</code></td>
       <td>노출</td>
       <td>보관함 (성립된 <code>CardConnection</code>)</td>
     </tr>
     <tr>
       <td><code>CONNECTION_REJECTED</code> (2)</td>
       <td><code>ConnectionRequestsService.rejectRequest()</code></td>
-      <td>요청자</td>
+      <td>요청자 <code>requesterCard.userId</code></td>
       <td>노출</td>
       <td>보낸 요청 목록</td>
+    </tr>
+    <tr>
+      <td><code>CONNECTION_REQUESTED</code> (3) <span class="tag tag-be">신규</span></td>
+      <td><code>ConnectionRequestsService.createRequest()</code><br>
+          <span style="font-size:13px">신규 생성 · 되살리기 <strong>두 경로 모두</strong></span></td>
+      <td>요청 받은 사람 <code>receiverCard.userId</code></td>
+      <td>노출</td>
+      <td>받은 요청함 (<code>cardId</code> 필요)</td>
     </tr>
   </tbody>
 </table>
@@ -319,6 +330,23 @@
 단, 재연결 시 목록을 다시 불러올 때 과거 알림이 토스트로 쏟아지지 않도록
 <strong>토스트는 SSE 이벤트 수신 경로에서만</strong> 띄운다 (<a href="#toast">6.4</a>).
 </p>
+
+<div class="note">
+<p><strong><code>CONNECTION_REQUESTED</code>는 성격이 다른 알림이다.</strong>
+1·2는 이미 끝난 일의 <em>통보</em>라서 클릭하면 결과를 보여주면 된다.
+3은 <strong>수신자에게 행동(수락/거절)을 요구하는 알림</strong>이므로 다음 두 가지가 따라온다.</p>
+<ul>
+  <li><strong>요청이 사라질 수 있다.</strong> 요청자가 <code>cancelRequest()</code>로 취소하면
+  이미 보낸 알림은 가리키는 대상이 없어진다. 취소 시 알림을 삭제하거나 무효화하지 <strong>않는다</strong> —
+  알림함은 발생 사실의 기록이고, 되돌리기 연쇄를 만들면 스냅샷 전략과 충돌한다.
+  대신 <strong>프론트가 클릭 시 대상 없음(404 · 목록에 없음)을 정상 경로로 처리한다.</strong></li>
+  <li><strong>같은 카드쌍에서 반복 발생할 수 있다.</strong> 거절 후 재요청은
+  <code>reviveRequest()</code>로 같은 <code>requestId</code>를 되살리므로
+  <strong>같은 <code>requestId</code>의 알림이 여러 건 쌓인다.</strong> 초기 구현에서는 그대로 둔다
+  (재요청 자체를 막는 정책이 없으므로 알림 단계에서 억제하면 사용자가 요청 도착을 놓친다).
+  스팸 제보가 나오면 카드쌍 단위 쿨다운으로 <strong>요청 API에서</strong> 막는다 — 알림에서 막지 않는다.</li>
+</ul>
+</div>
 
 <h3 id="tech-choice">1.2 기술 선택</h3>
 
@@ -401,7 +429,8 @@
     <tr>
       <td>알림 생성</td>
       <td>—</td>
-      <td>수락/거절 트랜잭션 직후 <code>Notification</code> INSERT</td>
+      <td>요청 생성 · 수락 · 거절 직후 <code>Notification</code> INSERT<br>
+          <strong>수신자 방향은 타입마다 다름</strong> (<a href="#events">1.1</a>)</td>
     </tr>
     <tr>
       <td>인스턴스 간 전달</td>
@@ -420,7 +449,7 @@
     </tr>
     <tr>
       <td>UI 표현</td>
-      <td>벨 뱃지, 드롭다운, 토스트<br>클릭 시 보관함/요청목록 이동</td>
+      <td>벨 뱃지, 드롭다운, 토스트<br>클릭 시 보관함/보낸요청/받은요청함 이동</td>
       <td>—</td>
     </tr>
     <tr>
@@ -542,7 +571,90 @@ A와 B의 SSE 커넥션은 서로 다른 백엔드 인스턴스에 붙어 있을
   </div>
 </div>
 
-<h3 id="flow-reconnect">3.2 재연결 (네트워크 단절 · 서버 재배포)</h3>
+<h3 id="flow-request">3.2 연결 요청 도착 → 수신자에게 알림 도달</h3>
+
+<p>
+3.1의 거울상이다. 방향만 뒤집히고 전달 경로(DB 저장 → Redis 발행 → 구독 인스턴스 push)는 완전히 같다.
+여기서도 <strong>A</strong> = 요청을 보내는 사용자, <strong>B</strong> = 요청을 받는 사용자(이번에는 <strong>B가 알림 수신자</strong>)이며,
+B는 이미 <a href="#flow-main">3.1</a>의 1~4단계로 자신의 SSE 스트림을 열고 <code>noti:{B.userId}</code>를 구독 중이라고 가정한다.
+</p>
+
+<div class="flow">
+  <div class="flow-row">
+    <div class="flow-no">1</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-fe">FRONTEND (A) → BACKEND</div>
+      <div class="flow-desc">A가 상대 카드에서 연결 요청 → <code>POST /connection-requests</code>
+        <span class="sub">인스턴스 #2가 받았다고 가정. B의 커넥션은 #1에 붙어 있다.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">2</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">BACKEND #2</div>
+      <div class="flow-desc">기존 검증 — 자기 카드 여부 · 상대 카드 존재/활성 · 카드쌍 중복
+        <span class="sub"><code>PENDING</code>·<code>ACCEPTED</code>면 409로 끝난다. <strong>이 경로에서는 알림이 발생하지 않는다.</strong></span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">3</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">BACKEND #2</div>
+      <div class="flow-desc">요청 레코드 확정 — <code>createRequest()</code> <strong>또는</strong> <code>reviveRequest()</code>
+        <span class="sub">거절/취소된 요청을 되살리는 경로도 B 입장에서는 새 요청이다.
+        <strong>두 경로 모두 알림을 발행해야 한다</strong> (<a href="#be-hook">5.5</a>).</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">4</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">BACKEND #2</div>
+      <div class="flow-desc"><code>Notification</code> INSERT — 수신자는 <code>receiverCard.userId</code>
+        <span class="sub">3.1의 7단계와 수신자 방향만 반대다. 여기서도 DB 저장이 먼저다.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">5</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">BACKEND #2 → Redis</div>
+      <div class="flow-desc"><code>PUBLISH noti:{B.userId} {payload}</code></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">6</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-be">Redis → BACKEND #1 → FRONTEND (B)</div>
+      <div class="flow-desc">구독 중인 #1이 B의 커넥션으로 <code>event: notification</code> 전송</div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">7</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-fe">FRONTEND (B)</div>
+      <div class="flow-desc">벨 뱃지 + 토스트 → 클릭 시 <code>?cardId={payload.receiverCardId}</code>로 받은 요청함 이동
+        <span class="sub">받은 요청함이 카드 스코프이므로 <strong>내 어느 카드가 받았는지</strong>가 페이로드에 있어야 한다.</span></div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">8</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-fe">FRONTEND (B) → BACKEND</div>
+      <div class="flow-desc">B가 수락/거절 → <a href="#flow-main">3.1</a>의 5단계로 이어져 A에게 결과 알림이 간다
+        <span class="sub">두 흐름이 맞물려 왕복이 완성된다.</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+<p><strong>B가 요청을 처리해도 이 알림은 자동으로 읽음이 되지 않는다.</strong>
+읽음 처리는 <code>PATCH /notifications/:id/read</code> 단건 API뿐이고
+수락/거절 API는 알림 상태를 건드리지 않는다. 알림함에 "이미 처리한 요청"이 미읽음으로 남는 게 거슬리면
+<strong>프론트에서</strong> 수락/거절 성공 직후 해당 알림에 읽음 API를 호출하는 쪽이 맞다 —
+백엔드가 알림 ID를 역추적하려면 <code>payload.requestId</code>로 JSON 컬럼을 조회해야 하고,
+이는 인덱스가 없는 스캔이다.</p>
+</div>
+
+<h3 id="flow-reconnect">3.3 재연결 (네트워크 단절 · 서버 재배포)</h3>
 
 <div class="flow">
   <div class="flow-row">
@@ -572,7 +684,7 @@ A와 B의 SSE 커넥션은 서로 다른 백엔드 인스턴스에 붙어 있을
   </div>
 </div>
 
-<h3 id="flow-logout">3.3 로그아웃</h3>
+<h3 id="flow-logout">3.4 로그아웃</h3>
 
 <p>
 프론트가 <code>es.close()</code>로 스트림을 닫고 알림 상태를 비운다.
@@ -580,7 +692,7 @@ A와 B의 SSE 커넥션은 서로 다른 백엔드 인스턴스에 붙어 있을
 백엔드는 커넥션 종료 이벤트에서 Redis 구독을 해제한다.
 </p>
 
-<h3 id="flow-teardown">3.4 커넥션 회수 — 언제, 어떻게 정리되는가</h3>
+<h3 id="flow-teardown">3.5 커넥션 회수 — 언제, 어떻게 정리되는가</h3>
 
 <p>
 SSE는 장수명 커넥션이라 <strong>"클라이언트가 사라졌을 때 서버가 그것을 언제 아는가"</strong>가
@@ -723,15 +835,44 @@ data: {"id":"01J8ZK3M4N5P6Q7R8S9T0V1W2X","userId":"01J8ZY...","type":1,
        "counterpartCardId":"01J8ZC...","counterpartName":"김노디"},
        "readAt":null,"createdAt":"2026-07-29T04:12:33.000Z"}
 
+event: notification
+data: {"id":"01J8ZK3M4N5P6Q7R8S9T0V1W3Y","userId":"01J8ZB...","type":3,
+       "payload":{"requestId":"01J8ZA...","receiverCardId":"01J8ZD...",
+       "counterpartCardId":"01J8ZC...","counterpartName":"박노디"},
+       "readAt":null,"createdAt":"2026-07-30T02:41:07.000Z"}
+
 event: ping
 data:
 
 </code></pre>
 
 <ul>
-  <li><code>type</code>은 <code>1 = ACCEPTED</code>, <code>2 = REJECTED</code>. 표시 문구는 프론트가 조립한다 (서버가 문장을 들고 있으면 카피 수정 때마다 배포가 필요하다).</li>
+  <li><code>type</code>은 <code>1 = ACCEPTED</code>, <code>2 = REJECTED</code>, <code>3 = REQUESTED</code>. 표시 문구는 프론트가 조립한다 (서버가 문장을 들고 있으면 카피 수정 때마다 배포가 필요하다).</li>
+  <li><code>counterpartCardId</code> / <code>counterpartName</code>은 <strong>항상 "나 아닌 쪽" 카드</strong>다.
+  1·2에서는 응답한 사람의 카드(<code>receiverCard</code>), 3에서는 요청을 보낸 사람의 카드(<code>requesterCard</code>).
+  프론트는 타입과 무관하게 이 두 필드로 문구를 만들 수 있다.</li>
   <li><code>payload.connectionId</code>는 수락일 때만 존재. 토스트/알림 클릭 시 보관함 상세로 이동하는 데 쓴다.</li>
-  <li><code>event: ping</code>은 20초 주기 heartbeat다. 프론트에 <code>ping</code> 리스너가 없으므로 브라우저가 디스패치 후 그냥 버린다 (<a href="#fe-heartbeat">6.6</a>). 역할은 <a href="#flow-teardown">3.4</a> 참고.</li>
+  <li><code>payload.receiverCardId</code>는 <strong>요청 도착(3)일 때만 존재</strong>하며 <strong>수신자 본인의 카드 ID</strong>다.
+  받은 요청함이 <code>GET /connection-requests/received?cardId=</code> 카드 스코프이므로 이 값 없이는 이동 경로를 만들 수 없다.</li>
+</ul>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th style="width:28%">payload 필드</th><th style="width:24%">1 ACCEPTED</th><th style="width:24%">2 REJECTED</th><th style="width:24%">3 REQUESTED</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>requestId</code></td><td>○</td><td>○</td><td>○</td></tr>
+    <tr><td><code>counterpartCardId</code></td><td>○ (receiver)</td><td>○ (receiver)</td><td>○ (requester)</td></tr>
+    <tr><td><code>counterpartName</code></td><td>○</td><td>○</td><td>○</td></tr>
+    <tr><td><code>connectionId</code></td><td>○</td><td>—</td><td>—</td></tr>
+    <tr><td><code>receiverCardId</code></td><td>—</td><td>—</td><td>○ (내 카드)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<ul>
+  <li><code>event: ping</code>은 20초 주기 heartbeat다. 프론트에 <code>ping</code> 리스너가 없으므로 브라우저가 디스패치 후 그냥 버린다 (<a href="#fe-heartbeat">6.6</a>). 역할은 <a href="#flow-teardown">3.5</a> 참고.</li>
 </ul>
 
 <div class="note">
@@ -814,14 +955,14 @@ private channelOf(userId: string) { return `noti:${userId}`; }</code></pre>
 <pre><code>model Notification {
   id String @id @default(ulid()) @db.Char(26)
 
-  userId String @map("user_id") @db.Char(26)   // 수신자 = 요청을 보낸 사람
+  userId String @map("user_id") @db.Char(26)   // 수신자 — 타입에 따라 요청자 또는 요청 수신자
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // 1: CONNECTION_ACCEPTED, 2: CONNECTION_REJECTED
+  // 1: CONNECTION_ACCEPTED, 2: CONNECTION_REJECTED, 3: CONNECTION_REQUESTED
   type Int @db.TinyInt
 
   // 화면 조립에 필요한 최소 스냅샷
-  // { requestId, connectionId?, counterpartCardId, counterpartName }
+  // { requestId, connectionId?, receiverCardId?, counterpartCardId, counterpartName }
   payload Json
 
   readAt    DateTime? @map("read_at") @db.DateTime(3)
@@ -837,10 +978,31 @@ private channelOf(userId: string) { return `noti:${userId}`; }</code></pre>
 export const NotificationType = {
   CONNECTION_ACCEPTED: 1,
   CONNECTION_REJECTED: 2,
+  CONNECTION_REQUESTED: 3,
 } as const;
 
 export type NotificationType =
-  (typeof NotificationType)[keyof typeof NotificationType];</code></pre>
+  (typeof NotificationType)[keyof typeof NotificationType];
+
+// 요청 도착 알림 — 수신자 본인 카드(receiverCardId)가 이동 경로에 필요하다
+export type ConnectionRequestedPayload = {
+  requestId: string;
+  receiverCardId: string;
+  counterpartCardId: string;   // 요청을 보낸 카드
+  counterpartName: string;
+};
+
+// CreateNotificationInput 판별 유니온에 아래 분기를 추가한다.
+// | { type: typeof NotificationType.CONNECTION_REQUESTED;
+//     payload: ConnectionRequestedPayload }
+// NotificationPayload 유니온에도 ConnectionRequestedPayload 를 더한다.</code></pre>
+
+<div class="note">
+<p><strong>유니온에 분기를 추가하는 것이 이 타입의 존재 이유다.</strong>
+<code>CreateNotificationInput</code>은 <code>{ type, payload }</code> 짝을 묶은 판별 유니온이라
+요청 도착 알림에 <code>connectionId</code>를 넣거나 <code>receiverCardId</code>를 빠뜨리면
+<strong>컴파일 단계에서 걸린다.</strong> 페이로드 타입만 만들고 유니온에 넣지 않으면 이 보호가 사라진다.</p>
+</div>
 
 <div class="note">
 <p><strong>상대 카드 정보는 스냅샷으로 저장한다.</strong> 카드가 삭제되거나 이름이 바뀌어도
@@ -862,7 +1024,7 @@ export class NotificationsController {
     return merge(
       this.notificationsService.stream(user.id),
       // heartbeat — `event: ping` 프레임으로 나간다. 프록시 유휴 타임아웃 방지 +
-      // 죽은 커넥션 탐지 트리거 두 역할을 겸한다 (3.4 참고). 끄면 안 된다.
+      // 죽은 커넥션 탐지 트리거 두 역할을 겸한다 (3.5 참고). 끄면 안 된다.
       interval(20_000).pipe(map(() =&gt; ({ type: 'ping', data: '' }))),
     ).pipe(
       // 토큰은 연결 시점에 1회만 검증된다. 상한이 없으면 액세스 토큰이 만료된 뒤에도
@@ -1065,8 +1227,14 @@ export class NotificationsService {
 <h3 id="be-hook">5.5 기존 서비스 연동 지점</h3>
 
 <p>
-<code>src/module/connections/connection-requests.service.ts</code>의
-<code>acceptRequest()</code>(107행)와 <code>rejectRequest()</code>(121행) 두 곳에만 후킹한다.
+후킹 지점은 <code>src/module/connections/connection-requests.service.ts</code>의
+<strong>세 곳</strong>이다 — <code>createRequest()</code> · <code>acceptRequest()</code> · <code>rejectRequest()</code>.
+<code>cancelRequest()</code>에는 넣지 않는다 (<a href="#events">1.1</a>).
+</p>
+
+<h4>수락 · 거절 <span class="tag tag-be">적용됨</span></h4>
+
+<p>
 <code>getPendingRequestAsReceiver()</code>가 반환하는 <code>request</code>에
 <code>requesterCard</code>가 포함되어 있으므로 (<code>cancelRequest()</code>에서
 <code>request.requesterCard.userId</code>를 이미 참조 중) 수신자 조회를 위한 추가 쿼리가 필요 없다.
@@ -1092,7 +1260,80 @@ export class NotificationsService {
 <p><strong>알림 실패가 수락/거절을 롤백해서는 안 된다.</strong> 같은 트랜잭션에 묶으면
 Redis 장애가 연결 수락 API 전체를 실패시킨다. 연결 생성 트랜잭션이 끝난 뒤 알림을 만들고,
 <code>createNotificationSafely()</code>가 DB 생성 실패까지 로깅 후 삼킨다.
-DB 저장에 성공하고 Redis 발행만 실패한 경우에는 알림함 조회로 보정된다.</p>
+DB 저장에 성공하고 Redis 발행만 실패한 경우에는 알림함 조회로 보정된다.
+<strong>요청 도착 알림도 같은 규칙이다</strong> — 알림이 실패해도 요청 자체는 생성되어야 한다.</p>
+</div>
+
+<h4>요청 도착 <span class="tag tag-be">신규</span></h4>
+
+<p>
+<code>createRequest()</code>는 <strong>요청 레코드가 확정되는 지점이 두 곳</strong>이라
+수락/거절보다 손이 더 간다. 신규 생성 경로와, 거절/취소된 요청을 되살리는
+<code>reviveRequest()</code> 경로다. 현재 코드는 되살리기에서 <code>return</code>으로 즉시 빠져나가므로
+<strong>그 구조를 유지하면 재요청에는 알림이 가지 않는다.</strong>
+</p>
+
+<pre><code>// 거절/취소된 요청은 되살린다.
+if (existing) {
+  ...
+  const revived = await this.connectionsRepository.reviveRequest(
+    existing.id,
+    message ?? null,
+  );
+  await this.notifyRequested(receiverCard, requesterCard, revived.id);
+  return;                       // ← 알림을 보낸 뒤에 반환한다
+}
+
+const created = await this.connectionsRepository.createRequest({
+  requesterCardId,
+  receiverCardId,
+  message,
+});
+await this.notifyRequested(receiverCard, requesterCard, created.id);</code></pre>
+
+<pre><code>private async notifyRequested(
+  receiverCard: CardOwnership,
+  requesterCard: CardOwnership,
+  requestId: string,
+): Promise&lt;void&gt; {
+  await this.createNotificationSafely(receiverCard.userId, {
+    type: NotificationType.CONNECTION_REQUESTED,
+    payload: {
+      requestId,
+      receiverCardId: receiverCard.id,       // 수신자 본인 카드 — 받은 요청함 이동용
+      counterpartCardId: requesterCard.id,   // 요청을 보낸 카드
+      counterpartName: requesterCard.nickname,
+    },
+  });
+}</code></pre>
+
+<div class="note">
+<p><strong>선행 변경: <code>CardOwnership</code>에 <code>nickname</code>을 추가해야 한다.</strong>
+<code>counterpartName</code>에 넣을 요청자 카드의 닉네임을 현재 조회에서 얻을 수 없다.</p>
+<ul>
+  <li><code>findCardOwnership()</code>은 <code>{ id, userId, isActive }</code>만 select 한다
+  (<code>connections.repository.ts:28-33</code>).</li>
+  <li><code>createRequest()</code> · <code>reviveRequest()</code>가 반환하는 <code>SentConnectionRequest</code>는
+  <code>receiverCard</code>만 include 한다 (<code>sentRequestIncludeOptions</code>) — <strong>요청자 카드가 없다.</strong></li>
+</ul>
+<p>따라서 <code>CardOwnership</code> 타입과 select에 <code>nickname: true</code> 한 줄을 더하는 것이
+가장 저렴하다. <code>createRequest()</code>가 <strong>이미 양쪽 카드를 각각 조회</strong>하고 있으므로
+<strong>추가 쿼리가 발생하지 않는다.</strong> 반대로 <code>ConnectionRequestWithParties</code>처럼
+요청 레코드에 양쪽 카드를 include 하는 방향으로 가면 요청 생성 경로에 조회가 하나 더 붙는다.</p>
+</div>
+
+<div class="note">
+<p><strong><code>requestId</code>는 리포지토리 반환값에서 가져온다.</strong>
+<code>createRequest()</code>와 <code>reviveRequest()</code>는 둘 다 <code>SentConnectionRequest</code>를 반환하므로
+ID를 얻기 위한 재조회가 필요 없다. 다만 현재 서비스 코드는 두 호출의 <strong>반환값을 버리고 있어</strong>
+변수로 받는 수정이 필요하다. <code>createNotificationSafely()</code>는 실패 로그에
+<code>input.payload.requestId</code>를 쓰는데 세 페이로드 모두 이 필드를 가지므로 그대로 동작한다.</p>
+</div>
+
+<div class="note">
+<p><strong>409로 끝나는 경로에는 알림이 없다.</strong> 같은 카드쌍에 <code>PENDING</code>·<code>ACCEPTED</code> 요청이
+이미 있으면 <code>ConflictException</code>으로 반환되므로 알림 코드에 도달하지 않는다.
+"수락 후 다시 요청 → 알림 도착"은 <strong>일어나지 않는다</strong>는 뜻이고, 이는 의도된 동작이다.</p>
 </div>
 
 <h3 id="be-nginx">5.6 nginx 설정</h3>
@@ -1385,26 +1626,51 @@ export default defineConfig({
 
 <h3 id="toast">6.4 토스트</h3>
 
-<p>알림 타입이 두 개뿐이므로 분기가 단순하다. 문구는 프론트가 조립한다.</p>
+<p>알림 타입이 세 개뿐이므로 분기가 단순하다. 문구는 프론트가 조립한다.</p>
 
 <pre><code>const NOTIFICATION_TYPE = {
   CONNECTION_ACCEPTED: 1,
   CONNECTION_REJECTED: 2,
+  CONNECTION_REQUESTED: 3,
 };
 
 function showToast(noti) {
   const name = noti.payload.counterpartName;
 
-  if (noti.type === NOTIFICATION_TYPE.CONNECTION_ACCEPTED) {
-    toast.success(`${name}님이 연결 요청을 수락했습니다.`, {
-      onClick: () =&gt; navigate(`/collections/${noti.payload.connectionId}`),
-    });
-  } else {
-    toast.info(`${name}님이 연결 요청을 거절했습니다.`, {
-      onClick: () =&gt; navigate('/connections/sent'),
-    });
+  switch (noti.type) {
+    case NOTIFICATION_TYPE.CONNECTION_ACCEPTED:
+      return toast.success(`${name}님이 연결 요청을 수락했습니다.`, {
+        onClick: () =&gt; navigate(`/collections/${noti.payload.connectionId}`),
+      });
+    case NOTIFICATION_TYPE.CONNECTION_REJECTED:
+      return toast.info(`${name}님이 연결 요청을 거절했습니다.`, {
+        onClick: () =&gt; navigate('/connections/sent'),
+      });
+    case NOTIFICATION_TYPE.CONNECTION_REQUESTED:
+      return toast.info(`${name}님이 연결 요청을 보냈습니다.`, {
+        // 받은 요청함은 카드 스코프 — receiverCardId 가 없으면 어느 카드의 요청함인지 알 수 없다
+        onClick: () =&gt; navigate(
+          `/connections/received?cardId=${noti.payload.receiverCardId}`,
+        ),
+      });
+    default:
+      return;   // 서버에 새 타입이 추가되어도 조용히 무시한다
   }
 }</code></pre>
+
+<div class="note">
+<p><strong><code>default</code>를 비워두는 것이 <code>else</code>보다 안전하다.</strong>
+기존 <code>if / else</code> 구조에서는 서버에 타입 4가 추가되는 순간
+<strong>모든 신규 알림이 "거절했습니다"로 표시된다.</strong> 배포 순서상 백엔드가 먼저 나가는 것이
+정상이므로, 프론트는 모르는 타입을 <strong>토스트하지 않고 넘기고</strong> 벨 목록에만 남기는 쪽이 맞다.</p>
+</div>
+
+<div class="note">
+<p><strong>요청 도착 알림은 클릭 대상이 사라질 수 있다.</strong> 요청자가 취소했거나
+이미 처리한 요청이면 받은 요청함에 없다 (<a href="#events">1.1</a>).
+목록 진입 후 해당 <code>requestId</code>가 없을 때 "이미 처리되었거나 취소된 요청입니다" 정도로 안내하고
+목록을 그대로 보여준다 — 빈 화면이나 에러 페이지로 떨어지지 않게 한다.</p>
+</div>
 
 <div class="note">
 <p><strong>토스트는 SSE 이벤트 리스너에서만 호출한다.</strong> <code>syncFromServer()</code>에서
@@ -1447,7 +1713,7 @@ function showToast(noti) {
 <p>
 heartbeat를 더 적극적으로 쓴다면 용도는 하나 —
 <strong>서버 방향의 조용한 죽음을 감지하는 것</strong>이다.
-<a href="#flow-teardown">3.4</a>에서 다룬 문제의 거울상으로, 중간 방화벽이 커넥션을 조용히 끊거나
+<a href="#flow-teardown">3.5</a>에서 다룬 문제의 거울상으로, 중간 방화벽이 커넥션을 조용히 끊거나
 서버가 비정상 종료되면 클라이언트도 즉시 알지 못한다.
 이벤트도 에러도 없는 상태로 몇 분간 죽어 있을 수 있고, 그동안 재연결은 발동하지 않는다.
 </p>
@@ -1764,7 +2030,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     </tr>
     <tr>
       <td>둘 다 접속자 수를 따라 오르내림</td>
-      <td>정상. 좀비 커넥션이 섞여 있어도 15분 내 회수된다 (3.4)</td>
+      <td>정상. 좀비 커넥션이 섞여 있어도 15분 내 회수된다 (3.5)</td>
     </tr>
     <tr>
       <td>배포 후 <code>localChannels</code>가 0에서 회복되지 않음</td>
@@ -1795,7 +2061,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 <p>
 임계값은 운영 초기 <strong>실제 동시 접속자 수를 관찰한 뒤</strong> 정한다.
 처음부터 숫자를 박으면 오탐이거나 무의미하다.
-<code>for: 30m</code>을 둔 이유는 비정상 단절 커넥션이 최대 15분간 남기 때문이다(3.4).
+<code>for: 30m</code>을 둔 이유는 비정상 단절 커넥션이 최대 15분간 남기 때문이다(3.5).
 그보다 짧게 잡으면 정상적인 회수 지연을 누수로 오인한다.
 </p>
 
@@ -1896,7 +2162,7 @@ Prometheus라면 <code>up{job="redis"} == 0</code>으로 <em>죽었다는 사실
     <tr>
       <td><span class="tag tag-be">BE</span></td>
       <td><strong>heartbeat를 끄면 죽은 커넥션이 최대 2시간 남는다</strong></td>
-      <td>20초 주기 유지. 프록시 타임아웃 방지 + 재전송 타이머 트리거 이중 역할 (<a href="#flow-teardown">3.4</a>)</td>
+      <td>20초 주기 유지. 프록시 타임아웃 방지 + 재전송 타이머 트리거 이중 역할 (<a href="#flow-teardown">3.5</a>)</td>
     </tr>
     <tr>
       <td><span class="tag tag-be">BE</span></td>
@@ -1915,8 +2181,28 @@ Prometheus라면 <code>up{job="redis"} == 0</code>으로 <em>죽었다는 사실
     </tr>
     <tr>
       <td><span class="tag tag-be">BE</span></td>
-      <td>알림 발행 실패가 수락/거절 API를 실패시킴</td>
+      <td>알림 발행 실패가 요청 생성 · 수락 · 거절 API를 실패시킴</td>
       <td>트랜잭션 밖 호출 + 예외 삼키고 로깅. DB 저장이 진실의 원천</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-be">BE</span></td>
+      <td><strong>되살리기(<code>reviveRequest()</code>) 경로가 <code>return</code>으로 빠져나가 재요청 알림이 누락된다</strong></td>
+      <td>거절/취소된 요청 재요청도 수신자에게는 새 요청이다. 두 경로 모두 후킹 (<a href="#be-hook">5.5</a>)</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-be">BE</span></td>
+      <td>요청자 카드 닉네임이 현재 조회 결과에 없다</td>
+      <td><code>CardOwnership</code>에 <code>nickname</code> 추가 — 이미 조회 중이라 추가 쿼리 없음 (<a href="#be-hook">5.5</a>)</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fe">FE</span></td>
+      <td><strong>타입 분기를 <code>if / else</code>로 두면 신규 타입이 "거절"로 표시된다</strong></td>
+      <td><code>switch</code> + 빈 <code>default</code>. 백엔드가 먼저 배포되는 것이 정상 순서 (<a href="#toast">6.4</a>)</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fe">FE</span></td>
+      <td>요청 도착 알림 클릭 시 대상 요청이 이미 취소·처리되어 없을 수 있다</td>
+      <td>안내 후 목록 유지. 알림은 취소 시에도 삭제하지 않는다 (<a href="#events">1.1</a>)</td>
     </tr>
     <tr>
       <td><span class="tag tag-be">BE</span></td>
@@ -1935,7 +2221,7 @@ Prometheus라면 <code>up{job="redis"} == 0</code>으로 <em>죽었다는 사실
 <h2 id="future">10. 확장: Web Push</h2>
 
 <p>
-브라우저가 닫힌 상태에서도 수락/거절 결과를 알려야 한다면
+브라우저가 닫힌 상태에서도 요청 도착이나 수락/거절 결과를 알려야 한다면
 <strong>SSE를 대체하지 않고 병행</strong>한다. 탭이 열려 있으면 SSE, 닫혀 있으면 Web Push가 표준 조합이다.
 </p>
 
@@ -1967,6 +2253,11 @@ Prometheus라면 <code>up{job="redis"} == 0</code>으로 <em>죽었다는 사실
   <li><code>takeUntil(timer(30분))</code>으로 스트림 수명 제한 → 주기적 재인증 (<a href="#be-controller">5.3</a>)</li>
   <li>페이지 기반 목록 API(<code>isRead</code> 필터) / 단건 읽음 처리 API</li>
   <li><code>acceptRequest()</code> · <code>rejectRequest()</code>에 알림 생성 후킹 (트랜잭션 밖)</li>
+  <li><strong>요청 도착 알림</strong> — <code>NotificationType.CONNECTION_REQUESTED: 3</code> +
+      <code>ConnectionRequestedPayload</code>를 <code>CreateNotificationInput</code> 유니온에 추가 (<a href="#be-model">5.2</a>)</li>
+  <li><strong><code>CardOwnership</code>에 <code>nickname</code> 추가</strong> — 타입 + <code>findCardOwnership()</code> select (<a href="#be-hook">5.5</a>)</li>
+  <li><code>createRequest()</code>의 <strong>신규 생성 · 되살리기 두 경로 모두</strong> 후킹 —
+      리포지토리 반환값에서 <code>requestId</code> 확보, 되살리기의 <code>return</code> 앞에 알림 (<a href="#be-hook">5.5</a>)</li>
   <li>nginx SSE 전용 location + 내부·앞단 nginx 버퍼링 해제 (<a href="#be-nginx">5.6</a>)</li>
 </ul>
 
@@ -1988,7 +2279,10 @@ Prometheus라면 <code>up{job="redis"} == 0</code>으로 <em>죽었다는 사실
   <li><code>vite.config.js</code>에 <code>/api</code> 프록시 설정</li>
   <li>목록 · 읽음 처리 API 클라이언트</li>
   <li>벨 아이콘 뱃지 + 드롭다운 목록</li>
-  <li>토스트 2종 (수락 / 거절) + 클릭 시 라우팅</li>
+  <li>토스트 3종 (수락 / 거절 / <strong>요청 도착</strong>) + 클릭 시 라우팅 — <code>switch</code> + 빈 <code>default</code> (<a href="#toast">6.4</a>)</li>
+  <li>요청 도착 알림 클릭 → <code>?cardId={payload.receiverCardId}</code>로 받은 요청함 이동</li>
+  <li>대상 요청이 없을 때(취소 · 이미 처리) 안내 처리</li>
+  <li>수락/거절 성공 직후 해당 알림 읽음 처리 호출 (선택 — <a href="#flow-request">3.2</a>)</li>
   <li>로그아웃 시 상태 초기화 검증</li>
 </ul>
 
@@ -1996,6 +2290,9 @@ Prometheus라면 <code>up{job="redis"} == 0</code>으로 <em>죽었다는 사실
 <ul class="checklist">
   <li><strong>Level 1</strong> — <code>curl -N</code>로 <code>event: ping</code> 확인. <code>event:</code> 줄이 없으면 인터셉터 미수정 (<a href="#local-levels">7.2</a>)</li>
   <li><strong>Level 3 교차 인스턴스</strong> — 3001에 연결, 3002로 수락 요청 → 알림 도달 (이 설계의 최대 위험 지점)</li>
+  <li><strong>요청 도착</strong> — B가 스트림 연결 후 A가 요청 전송 → B에게만 알림, A에게는 오지 않음</li>
+  <li><strong>되살리기 경로</strong> — 거절된 요청을 A가 다시 보냄 → B에게 알림 도달 (<code>return</code> 누락 확인)</li>
+  <li>같은 카드쌍에 <code>PENDING</code>인 상태로 재요청 → 409, 알림 미발생 확인</li>
   <li><strong>Level 4 nginx 경유</strong> — <code>proxy_buffering</code> 확인. <strong>로컬에서만 통과하고 프로덕션에서 실패하는 유일한 항목</strong></li>
   <li>네트워크 강제 차단 후 재연결 및 누락 보정 확인</li>
   <li>재연결 시 과거 알림이 토스트로 쏟아지지 않는지 확인</li>

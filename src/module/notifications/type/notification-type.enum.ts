@@ -1,6 +1,7 @@
 export const NotificationType = {
   CONNECTION_ACCEPTED: 1,
   CONNECTION_REJECTED: 2,
+  CONNECTION_REQUESTED: 3,
 } as const;
 
 export type NotificationType =
@@ -19,6 +20,13 @@ export type ConnectionRejectedPayload = {
   counterpartName: string;
 };
 
+export type ConnectionRequestedPayload = {
+  requestId: string;
+  counterpartCardId: string; // 요청 대상 카드 ID
+  counterpartName: string; // 요청 대상 닉네임
+  receiverCardId: string; // 요청 시 선택한 내 카드 ID
+};
+
 export type CreateNotificationInput =
   | {
       type: typeof NotificationType.CONNECTION_ACCEPTED;
@@ -27,8 +35,13 @@ export type CreateNotificationInput =
   | {
       type: typeof NotificationType.CONNECTION_REJECTED;
       payload: ConnectionRejectedPayload;
+    }
+  | {
+      type: typeof NotificationType.CONNECTION_REQUESTED;
+      payload: ConnectionRequestedPayload;
     };
 
 export type NotificationPayload =
   | ConnectionAcceptedPayload
-  | ConnectionRejectedPayload;
+  | ConnectionRejectedPayload
+  | ConnectionRequestedPayload;

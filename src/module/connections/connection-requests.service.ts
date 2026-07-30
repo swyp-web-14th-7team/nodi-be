@@ -11,6 +11,7 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 import { CreateConnectionRequestDto } from '@/module/connections/dto/create-connection-request.dto';
 import {
+  CardOwnership,
   ConnectionRequestWithParties,
   ReceivedConnectionRequest,
   SentConnectionRequest,
@@ -79,17 +80,21 @@ export class ConnectionRequestsService {
         throw new ConflictException('이미 진행 중이거나 연결된 요청입니다.');
       }
       // 거절/취소된 요청은 되살린다.
-      return this.connectionsRepository.reviveRequest(
+      const revived = await this.connectionsRepository.reviveRequest(
         existing.id,
         message ?? null,
       );
+      await this.notifyRequested(requesterCard, receiverCard, revived.id);
+      return revived;
     }
 
-    return this.connectionsRepository.createRequest({
+    const created = await this.connectionsRepository.createRequest({
       requesterCardId,
       receiverCardId,
       message,
     });
+    await this.notifyRequested(requesterCard, receiverCard, created.id);
+    return created;
   }
 
   /** 특정 내 카드가 받은 PENDING 요청함 */
@@ -206,6 +211,23 @@ export class ConnectionRequestsService {
     return (
       typeof e === 'object' && e !== null && 'code' in e && e.code === 'P2002'
     );
+  }
+
+  /** 요청을 받은 사람에게 연결 요청 수신 알림 */
+  private async notifyRequested(
+    requesterCard: CardOwnership,
+    receiverCard: CardOwnership,
+    requestId: string,
+  ): Promise<void> {
+    await this.createNotificationSafely(receiverCard.userId, {
+      type: NotificationType.CONNECTION_REQUESTED,
+      payload: {
+        requestId,
+        counterpartCardId: requesterCard.id,
+        counterpartName: requesterCard.nickname,
+        receiverCardId: receiverCard.id,
+      },
+    });
   }
 
   private async createNotificationSafely(
