@@ -100,11 +100,23 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     this.statsInFlight = true;
 
     try {
+      // 개수만으로는 로컬 Map 과 Redis 가 왜 어긋나는지 알 수 없어 채널명까지 남긴다.
+      const local = this.pubsub.localChannelNames;
+      const redis = await this.pubsub.listChannels('noti:*');
+      const localSet = new Set(local);
+      const redisSet = new Set(redis);
+
       this.logger.info(
         {
           evt: 'sse_stats',
-          localChannels: this.pubsub.localChannelCount,
-          redisChannels: await this.pubsub.countChannels('noti:*'),
+          localChannels: local.length,
+          redisChannels: redis.length,
+          localChannelNames: local,
+          redisChannelNames: redis,
+          // Map 에만 있는 채널: SUBSCRIBE 실패 또는 finalize 미실행으로 남은 유령 엔트리
+          localOnly: local.filter((channel) => !redisSet.has(channel)),
+          // Redis 에만 있는 채널: 다른 인스턴스(blue/green)의 구독이거나 unsubscribe 반영 지연
+          redisOnly: redis.filter((channel) => !localSet.has(channel)),
         },
         'sse_stats',
       );

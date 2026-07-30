@@ -2,7 +2,7 @@ import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
 import { finalize, Observable, Subject } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { PinoLogger } from 'nestjs-pino';
 import { buildRedisOptions, getRedisUrl } from '@/lib/redis/redis.config';
 
 @Injectable()
@@ -62,9 +62,23 @@ export class RedisPubsubService implements OnModuleInit, OnModuleDestroy {
     await this.pub.publish(channel, message);
   }
 
-  async countChannels(pattern: string): Promise<number> {
+  /**
+   * PUBSUB CHANNELS 는 이 Redis 서버에 붙은 모든 클라이언트를 합쳐
+   * 구독자가 1명 이상인 채널을 돌려준다. 즉 blue/green 등 다른 인스턴스의
+   * 구독도 함께 잡히므로 localChannelNames 와 1:1 로 대응하지 않는다.
+   */
+  async listChannels(pattern: string): Promise<string[]> {
     const channels = await this.pub.pubsub('CHANNELS', pattern);
-    return channels.length;
+    return channels.map((channel) => String(channel));
+  }
+
+  async countChannels(pattern: string): Promise<number> {
+    return (await this.listChannels(pattern)).length;
+  }
+
+  /** 이 프로세스가 Subject 를 들고 있는 채널명. 패턴 필터는 걸려 있지 않다. */
+  get localChannelNames(): string[] {
+    return Array.from(this.channels.keys());
   }
 
   get localChannelCount(): number {

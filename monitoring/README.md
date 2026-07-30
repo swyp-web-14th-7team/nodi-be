@@ -164,11 +164,13 @@ nginx 는 `conf.d/default.conf` 의 `log_format json_log` 로 JSON 을 출력합
 ### 한 줄 요약으로 보기 (대시보드와 동일한 표시)
 
 ```logql
-{service=~"backend_.+"} | json | line_format "{{if .req_method}}{{.req_method}} {{.req_url}} → {{.res_statusCode}} ({{.responseTime}}ms){{else}}{{.msg}}{{end}}{{if .user_nickname}} [{{.user_nickname}}]{{end}}"
+{service=~"backend_.+"} | json | evt!="sse_stats" | line_format "{{if .req_method}}{{.req_method}} {{.req_url}} → {{.res_statusCode}} ({{.responseTime}}ms){{else}}{{.msg}}{{end}}{{if .user_nickname}} [{{.user_nickname}}]{{end}}"
 ```
 
-`GET /profile-cards → 200 (12ms) [홍길동]` 처럼 접힌 한 줄로 나옵니다. 줄을 클릭하면
-원본 필드가 펼쳐집니다. 이 쿼리는 대시보드의 로그 패널과 동일합니다.
+`GET /profile-cards → 200 (12ms) [홍길동]` 처럼 접힌 한 줄로 나옵니다. 정상
+`sse_stats` 주기 로그는 전용 패널에서만 사용하도록 제외하지만 `sse_stats_failed` 경고는
+계속 표시합니다. 줄을 클릭하면 원본 필드가 펼쳐집니다. 이 쿼리는 대시보드의 로그 패널과
+동일합니다.
 
 ### 실시간 스트리밍 (Live, 웹소켓)
 
