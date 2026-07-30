@@ -9,7 +9,7 @@ import { RedisPubsubService } from '@/lib/redis/redis-pubsub.service';
 import { NotificationsRepository } from '@/module/notifications/notifications.repository';
 import { map, Observable } from 'rxjs';
 import { CreateNotificationInput } from '@/module/notifications/type/notification-type.enum';
-import { PinoLogger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Notification } from '@/prisma/client';
 import { FindAllNotificationsDto } from '@/module/notifications/dto/find-all-notifications.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
@@ -23,10 +23,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly pubsub: RedisPubsubService,
     private readonly notificationRepository: NotificationsRepository,
+    @InjectPinoLogger(NotificationsService.name)
     private readonly logger: PinoLogger,
-  ) {
-    this.logger.setContext(NotificationsService.name);
-  }
+  ) {}
 
   onModuleInit(): void {
     this.statsTimer = setInterval(
@@ -100,23 +99,11 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     this.statsInFlight = true;
 
     try {
-      // 개수만으로는 로컬 Map 과 Redis 가 왜 어긋나는지 알 수 없어 채널명까지 남긴다.
-      const local = this.pubsub.localChannelNames;
-      const redis = await this.pubsub.listChannels('noti:*');
-      const localSet = new Set(local);
-      const redisSet = new Set(redis);
-
       this.logger.info(
         {
           evt: 'sse_stats',
-          localChannels: local.length,
-          redisChannels: redis.length,
-          localChannelNames: local,
-          redisChannelNames: redis,
-          // Map 에만 있는 채널: SUBSCRIBE 실패 또는 finalize 미실행으로 남은 유령 엔트리
-          localOnly: local.filter((channel) => !redisSet.has(channel)),
-          // Redis 에만 있는 채널: 다른 인스턴스(blue/green)의 구독이거나 unsubscribe 반영 지연
-          redisOnly: redis.filter((channel) => !localSet.has(channel)),
+          localChannels: this.pubsub.localChannelCount,
+          redisChannels: await this.pubsub.countChannels('noti:*'),
         },
         'sse_stats',
       );
