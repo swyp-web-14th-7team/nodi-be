@@ -14,9 +14,10 @@ export class RedisPubsubService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     configService: ConfigService,
-    @InjectPinoLogger(RedisPubsubService.name)
     private readonly logger: PinoLogger,
   ) {
+    this.logger.setContext(RedisPubsubService.name);
+
     this.sub = new Redis(buildRedisOptions(configService));
     this.pub = new Redis(buildRedisOptions(configService));
     this.redisUrl = getRedisUrl(configService);

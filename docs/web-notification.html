@@ -230,6 +230,7 @@
         <li><a href="#be-redis">5.4 Redis Pub/Sub (lib)</a></li>
         <li><a href="#be-hook">5.5 기존 서비스 연동</a></li>
         <li><a href="#be-nginx">5.6 nginx 설정</a></li>
+        <li><a href="#be-deploy">5.7 운영 배포 반영</a></li>
       </ul>
     </li>
     <li><a href="#frontend">6. 프론트엔드 구현</a>
@@ -253,7 +254,7 @@
       <ul class="sub">
         <li><a href="#obs-logging">8.1 sse_stats 로깅 전략</a></li>
         <li><a href="#obs-panels">8.2 Grafana 패널</a></li>
-        <li><a href="#obs-alert">8.3 알림 규칙</a></li>
+        <li><a href="#obs-alert">8.3 알림 규칙 (향후)</a></li>
         <li><a href="#obs-prometheus">8.4 Prometheus 미도입 근거</a></li>
       </ul>
     </li>
@@ -266,9 +267,9 @@
 <main>
 
 <h1>nodi 실시간 알림 설계 문서</h1>
-<p class="subtitle">연결 요청 수락 · 거절 알림의 실시간 전달(SSE) 구현 계획 — 프론트엔드 · 백엔드 역할 분리</p>
+<p class="subtitle">연결 요청 수락 · 거절 알림의 실시간 전달(SSE) 구현 현황 — 프론트엔드 · 백엔드 역할 분리</p>
 <p class="meta">
-  작성일 2026-07-29 ·
+  작성일 2026-07-29 · 구현 반영 2026-07-30 ·
   백엔드 nodi-be (NestJS 11 / Prisma 7 / MariaDB / Redis / nginx, <strong>인스턴스 2대</strong>) ·
   프론트엔드 Vite + React (JavaScript)
 </p>
@@ -468,15 +469,15 @@ A와 B의 SSE 커넥션은 서로 다른 백엔드 인스턴스에 붙어 있을
     <div class="flow-no">2</div>
     <div class="flow-body">
       <div class="flow-lane lane-fe">FRONTEND (A) → BACKEND</div>
-      <div class="flow-desc"><code>GET /api/notifications?limit=20</code>
-        <span class="sub">과거 알림과 미읽음 수를 먼저 확보. 이 응답은 토스트를 띄우지 않는다.</span></div>
+      <div class="flow-desc"><code>GET /notifications?page=1&amp;limit=20</code>
+        <span class="sub">과거 알림을 먼저 확보. 이 응답은 토스트를 띄우지 않는다.</span></div>
     </div>
   </div>
   <div class="flow-row">
     <div class="flow-no">3</div>
     <div class="flow-body">
       <div class="flow-lane lane-fe">FRONTEND (A) → BACKEND</div>
-      <div class="flow-desc"><code>GET /api/notifications/stream</code> (<code>Authorization: Bearer</code> 헤더)
+      <div class="flow-desc"><code>GET /notifications/stream</code> (<code>Authorization: Bearer</code> 헤더)
         <span class="sub">nginx가 인스턴스 #1로 라우팅했다고 가정. 응답이 열린 채 유지된다.</span></div>
     </div>
   </div>
@@ -491,7 +492,7 @@ A와 B의 SSE 커넥션은 서로 다른 백엔드 인스턴스에 붙어 있을
     <div class="flow-no">5</div>
     <div class="flow-body">
       <div class="flow-lane lane-fe">FRONTEND (B) → BACKEND</div>
-      <div class="flow-desc">B가 수락 버튼 클릭 → <code>PATCH /api/connection-requests/:id/accept</code>
+      <div class="flow-desc">B가 수락 버튼 클릭 → <code>PATCH /connection-requests/:id/accept</code>
         <span class="sub">이 요청은 인스턴스 #2가 받을 수 있다.</span></div>
     </div>
   </div>
@@ -677,8 +678,9 @@ redis-cli PUBSUB CHANNELS 'noti:*' | wc -l</code></pre>
 
 <p>
 두 수치가 <strong>접속 중인 사용자 수와 대략 비례</strong>하면 정상이다.
-운영 환경에서는 매번 셸에 붙지 않고 <a href="#observability">8장</a>의
-<code>sse_stats</code> 로깅으로 Grafana에서 추세를 본다.
+현재는 <code>RedisPubsubService.countChannels()</code>와 <code>localChannelCount</code>를
+진단에 사용할 수 있다. <a href="#observability">8장</a>의 <code>sse_stats</code> 주기 로깅과
+Grafana 시각화도 현재 적용되어 있다.
 </p>
 
 <h2 id="api">4. API 명세</h2>
@@ -690,37 +692,36 @@ redis-cli PUBSUB CHANNELS 'noti:*' | wc -l</code></pre>
   </thead>
   <tbody>
     <tr>
-      <td>GET</td><td><code>/api/notifications/stream</code></td>
+      <td>GET</td><td><code>/notifications/stream</code></td>
       <td>SSE 스트림. 연결 유지형</td>
       <td><code>text/event-stream</code></td>
     </tr>
     <tr>
-      <td>GET</td><td><code>/api/notifications</code></td>
-      <td>목록 조회 (<code>cursor</code>, <code>limit</code>)</td>
-      <td><code>{ items, nextCursor, unreadCount }</code></td>
+      <td>GET</td><td><code>/notifications</code></td>
+      <td>목록 조회 (<code>page</code>, <code>limit</code>, <code>sort</code>, <code>order</code>, <code>isRead</code>)</td>
+      <td><code>{ status, timestamp, data: { items, metadata } }</code></td>
     </tr>
     <tr>
-      <td>PATCH</td><td><code>/api/notifications/:id/read</code></td>
+      <td>PATCH</td><td><code>/notifications/:id/read</code></td>
       <td>단건 읽음 처리</td>
-      <td><code>{ unreadCount }</code></td>
-    </tr>
-    <tr>
-      <td>PATCH</td><td><code>/api/notifications/read-all</code></td>
-      <td>전체 읽음 처리</td>
-      <td><code>{ unreadCount: 0 }</code></td>
+      <td><code>{ status, timestamp, data: {} }</code></td>
     </tr>
   </tbody>
 </table>
 </div>
 
+<p>목록의 <code>items</code>는 <code>NotificationResponse</code>로 변환되므로
+<code>userId</code>는 노출하지 않고, <code>readAt</code>과 <code>createdAt</code>은
+<code>{ timestamp, isoString, timeAgo }</code> 형태다. SSE는 DB에서 생성된 알림을
+즉시 발행하므로 아래처럼 원본 JSON의 날짜 문자열과 <code>userId</code>를 포함한다.</p>
+
 <h3 id="api-payload">4.1 이벤트 페이로드</h3>
 
 <pre><code>event: notification
-id: 01J8ZK3M4N5P6Q7R8S9T0V1W2X
-data: {"id":"01J8ZK3M4N5P6Q7R8S9T0V1W2X","type":1,
-       "requestId":"01J8ZA...","connectionId":"01J8ZB...",
-       "counterpartCardId":"01J8ZC...","counterpartName":"김노디",
-       "createdAt":"2026-07-29T04:12:33.000Z"}
+data: {"id":"01J8ZK3M4N5P6Q7R8S9T0V1W2X","userId":"01J8ZY...","type":1,
+       "payload":{"requestId":"01J8ZA...","connectionId":"01J8ZB...",
+       "counterpartCardId":"01J8ZC...","counterpartName":"김노디"},
+       "readAt":null,"createdAt":"2026-07-29T04:12:33.000Z"}
 
 event: ping
 data:
@@ -729,7 +730,7 @@ data:
 
 <ul>
   <li><code>type</code>은 <code>1 = ACCEPTED</code>, <code>2 = REJECTED</code>. 표시 문구는 프론트가 조립한다 (서버가 문장을 들고 있으면 카피 수정 때마다 배포가 필요하다).</li>
-  <li><code>connectionId</code>는 수락일 때만 존재. 토스트/알림 클릭 시 보관함 상세로 이동하는 데 쓴다.</li>
+  <li><code>payload.connectionId</code>는 수락일 때만 존재. 토스트/알림 클릭 시 보관함 상세로 이동하는 데 쓴다.</li>
   <li><code>event: ping</code>은 20초 주기 heartbeat다. 프론트에 <code>ping</code> 리스너가 없으므로 브라우저가 디스패치 후 그냥 버린다 (<a href="#fe-heartbeat">6.6</a>). 역할은 <a href="#flow-teardown">3.4</a> 참고.</li>
 </ul>
 
@@ -752,7 +753,7 @@ NestJS <code>@Sse()</code>는 <code>MessageEvent</code> 객체를 직렬화하�
 </p>
 
 <pre><code>src/lib/redis/
-  redis.module.ts             # RedisService + RedisPubSubService 둘 다 export
+  redis.module.ts             # RedisService + RedisPubsubService 둘 다 export
   redis.service.ts            # 기존 그대로 (get / set / del)
   redis-pubsub.service.ts     # 신규 — sub·pub 커넥션, subscribe / publish / countChannels
   redis.config.ts             # 신규 — 연결 옵션 팩토리 (설정 중복 제거)
@@ -760,9 +761,9 @@ NestJS <code>@Sse()</code>는 <code>MessageEvent</code> 객체를 직렬화하�
 src/module/notifications/
   notifications.module.ts
   notifications.controller.ts       # @Sse('stream') + 목록 · 읽음 API
-  notifications.service.ts          # 채널 규칙(noti:{userId}) · 알림 생성 · sse_stats 로깅
+  notifications.service.ts          # 채널 규칙(noti:{userId}) · 알림 생성 · 목록 · 읽음 처리
   notifications.repository.ts
-  dto/notification-list.query.dto.ts
+  dto/find-all-notifications.dto.ts
   type/notification-type.enum.ts
   type/notification-response.type.ts</code></pre>
 
@@ -790,7 +791,7 @@ host · port · username · password 읽는 코드를 복사하게 되고,
 
 <h4>경계선</h4>
 
-<p><code>RedisPubSubService</code>에는 알림 도메인 지식이 없다. 채널 이름도 페이로드도 호출자가 정한다.</p>
+<p><code>RedisPubsubService</code>에는 알림 도메인 지식이 없다. 채널 이름도 페이로드도 호출자가 정한다.</p>
 
 <pre><code>// lib — 채널이 무엇인지 모른다
 subscribe(channel: string): Observable&lt;string&gt;
@@ -826,7 +827,7 @@ private channelOf(userId: string) { return `noti:${userId}`; }</code></pre>
   readAt    DateTime? @map("read_at") @db.DateTime(3)
   createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
 
-  @@index([userId, createdAt(sort: Desc)])   // 목록 조회
+  @@index([userId, createdAt])               // 목록 조회
   @@index([userId, readAt])                  // 미읽음 수 집계
   @@map("notifications")
 }</code></pre>
@@ -853,13 +854,13 @@ export type NotificationType =
 <pre><code>// src/module/notifications/notifications.controller.ts
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly notifications: NotificationsService) {}
+  constructor(private readonly notificationsService: NotificationsService) {}
 
   @Sse('stream')
-  @UseGuards(AuthGuard)
+  @Auth(UserRole.ADMIN, UserRole.USER)
   stream(@CurrentUser() user: User): Observable&lt;MessageEvent&gt; {
     return merge(
-      this.notifications.stream(user.id),
+      this.notificationsService.stream(user.id),
       // heartbeat — `event: ping` 프레임으로 나간다. 프록시 유휴 타임아웃 방지 +
       // 죽은 커넥션 탐지 트리거 두 역할을 겸한다 (3.4 참고). 끄면 안 된다.
       interval(20_000).pipe(map(() =&gt; ({ type: 'ping', data: '' }))),
@@ -886,18 +887,16 @@ export class NotificationsController {
 <strong>그런데 바로 그 "그대로 적용된다"가 문제를 일으킨다.</strong>
 </p>
 
-<h4>⚠ 전역 인터셉터가 SSE 프레임을 깨뜨린다 — 반드시 선행 수정</h4>
+<h4>전역 응답 인터셉터의 SSE 예외 처리</h4>
 
-<pre><code>// main.ts:16
-app.useGlobalInterceptors(new TransformInterceptor());
-
-// common/interceptor/transform.interceptor.ts — 모든 방출값에 map 이 걸린다
-return next.handle().pipe(
-  map((data) =&gt; new ResponseSuccess(data, HttpStatus.OK)),
-);</code></pre>
+<pre><code>// app/app.module.ts
+providers: [
+  { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
+]</code></pre>
 
 <p>
-<code>@Sse()</code>가 반환하는 Observable에도 이 <code>map</code>이 적용되어
+일반 HTTP 응답에는 <code>ResponseSuccess</code> 래핑이 적용된다. 그러나
+<code>@Sse()</code>가 반환하는 Observable까지 이 <code>map</code>을 적용하면
 <strong>이벤트 하나하나가 <code>ResponseSuccess</code>로 감싸진다.</strong>
 <code>ResponseSuccess</code>에는 <code>type</code> 필드가 없으므로
 Nest의 SSE 직렬화가 이벤트 이름을 잃는다.
@@ -916,7 +915,7 @@ data: {"id":"01J8…","type":1}           "data":{"type":"notification","data":"
 구조적으로 빠지는 셈이다.</p>
 </div>
 
-<p><strong>수정</strong> — 인터셉터에서 SSE 라우트를 통과시킨다.</p>
+<p><strong>현재 구현</strong> — 인터셉터에서 SSE 라우트는 응답 래핑 없이 통과시킨다.</p>
 
 <pre><code>@Injectable()
 export class TransformInterceptor&lt;T&gt;
@@ -935,20 +934,10 @@ export class TransformInterceptor&lt;T&gt;
 }</code></pre>
 
 <p>
-현재 <code>main.ts</code>가 <code>new TransformInterceptor()</code>로 직접 인스턴스화하고 있어
-<code>Reflector</code>가 주입되지 않는다. <code>AppModule</code>에서
-<code>APP_INTERCEPTOR</code> 프로바이더로 등록하는 방식으로 바꿔야 한다.
-</p>
-
-<pre><code>// app.module.ts
-providers: [
-  { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
-]
-// main.ts 의 app.useGlobalInterceptors(...) 는 제거</code></pre>
-
-<p>
-이 수정 없이는 <strong>알림 기능 전체가 동작하지 않는다.</strong>
-7.2의 Level 1(curl)에서 바로 드러나므로 구현 첫 단계에서 확인할 것.
+현재 <code>TransformInterceptor</code>는 <code>APP_INTERCEPTOR</code>로 등록되어
+<code>Reflector</code>를 정상 주입받는다. 이 예외 처리가 제거되면
+<strong>이름이 있는 SSE 이벤트가 동작하지 않으므로</strong>
+7.2의 Level 1(curl)에서 프레임을 확인해야 한다.
 </p>
 
 <h3 id="be-redis">5.4 Redis Pub/Sub <span class="tag tag-be">인스턴스 2대 필수</span></h3>
@@ -962,14 +951,14 @@ Redis Pub/Sub이 이 간극을 메운다. <code>ioredis</code>가 이미 의존�
 <h4><code>lib/redis/redis-pubsub.service.ts</code> — 인프라</h4>
 
 <pre><code>@Injectable()
-export class RedisPubSubService implements OnModuleInit, OnModuleDestroy {
+export class RedisPubsubService implements OnModuleInit, OnModuleDestroy {
   private readonly sub: Redis;
   private readonly pub: Redis;
   private readonly channels = new Map&lt;string, Subject&lt;string&gt;&gt;();
 
   constructor(
     configService: ConfigService,
-    @InjectPinoLogger(RedisPubSubService.name)
+    @InjectPinoLogger(RedisPubsubService.name)
     private readonly logger: PinoLogger,
   ) {
     // redis.config.ts 의 옵션 팩토리를 RedisService 와 공유한다
@@ -1042,9 +1031,12 @@ export class RedisPubSubService implements OnModuleInit, OnModuleDestroy {
 <pre><code>@Injectable()
 export class NotificationsService {
   constructor(
-    private readonly pubsub: RedisPubSubService,
-    private readonly repository: NotificationsRepository,
-  ) {}
+    private readonly pubsub: RedisPubsubService,
+    private readonly notificationRepository: NotificationsRepository,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(NotificationsService.name);
+  }
 
   private channelOf(userId: string) {
     return `noti:${userId}`;
@@ -1057,8 +1049,8 @@ export class NotificationsService {
       .pipe(map((raw) =&gt; ({ type: 'notification', data: raw })));
   }
 
-  async create(userId: string, dto: CreateNotificationDto) {
-    const noti = await this.repository.create({ id: ulid(), userId, ...dto });
+  async create(userId: string, dto: CreateNotificationInput) {
+    const noti = await this.notificationRepository.create({ userId, ...dto });
 
     // 발행 실패가 호출자(수락/거절)를 실패시키면 안 된다 — 5.5 참고
     try {
@@ -1084,33 +1076,32 @@ export class NotificationsService {
   const request = await this.getPendingRequestAsReceiver(user, id);
   try {
     const connection = await this.connectionsRepository.acceptRequest(request);
+    await this.createNotificationSafely(request.requesterCard.userId, {
+      type: NotificationType.CONNECTION_ACCEPTED,
+      payload: {
+        requestId: request.id,
+        connectionId: connection.id,
+        counterpartCardId: request.receiverCardId,
+        counterpartName: request.receiverCard.nickname,
+      },
+    });
   } catch (e) { /* 기존 충돌 처리 유지 */ }
-
-  // 알림은 본 트랜잭션 밖에서. 실패해도 수락 자체는 성립해야 한다.
-  await this.notifications.create(request.requesterCard.userId, {
-    type: NotificationType.CONNECTION_ACCEPTED,
-    payload: {
-      requestId: request.id,
-      connectionId: connection.id,
-      counterpartCardId: request.receiverCardId,
-      counterpartName: request.receiverCard.name,
-    },
-  });
 }</code></pre>
 
 <div class="note">
 <p><strong>알림 실패가 수락/거절을 롤백해서는 안 된다.</strong> 같은 트랜잭션에 묶으면
-Redis 장애가 연결 수락 API 전체를 실패시킨다. 트랜잭션 밖에서 호출하고,
-<code>publish</code> 실패는 로깅만 하고 삼킨다 — DB에는 이미 저장되어 있으므로
-사용자가 알림함을 열면 보인다.</p>
+Redis 장애가 연결 수락 API 전체를 실패시킨다. 연결 생성 트랜잭션이 끝난 뒤 알림을 만들고,
+<code>createNotificationSafely()</code>가 DB 생성 실패까지 로깅 후 삼킨다.
+DB 저장에 성공하고 Redis 발행만 실패한 경우에는 알림함 조회로 보정된다.</p>
 </div>
 
 <h3 id="be-nginx">5.6 nginx 설정</h3>
 
 <p>기본 설정 그대로면 nginx가 응답을 버퍼링해서 <strong>이벤트가 실시간으로 나가지 않는다.</strong></p>
 
-<pre><code>location /api/notifications/stream {
-    proxy_pass http://nodi_be;
+<pre><code>location /notifications/stream {
+    include /etc/nginx/active/upstream.conf;
+    proxy_pass http://$upstream;
     proxy_http_version 1.1;
 
     proxy_buffering off;          # 필수 — 없으면 이벤트가 버퍼에 갇힌다
@@ -1119,7 +1110,33 @@ Redis 장애가 연결 수락 API 전체를 실패시킨다. 트랜잭션 밖에
     proxy_read_timeout 3600s;     # heartbeat 가 멈췄을 때를 대비한 안전장치
     chunked_transfer_encoding off;
 
-    access_log off;               # 장수명 요청이 로그를 오염시킨다
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $forwarded_proto;
+    proxy_set_header X-Request-Id      $request_id;
+
+    add_header X-Accel-Buffering no;   # 앞단 nginx의 버퍼링도 방지
+}</code></pre>
+
+<p>운영 환경은 TLS를 종료하는 호스트 nginx가 Docker nginx(<code>127.0.0.1:8080</code>) 앞에
+한 단계 더 있으므로, 호스트 nginx에도 같은 SSE 전용 location이 필요하다.</p>
+
+<pre><code>location = /notifications/stream {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_set_header Connection '';
+    proxy_read_timeout 3600s;
+
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    add_header X-Accel-Buffering no always;
 }</code></pre>
 
 <div class="note">
@@ -1134,13 +1151,35 @@ Redis 장애가 연결 수락 API 전체를 실패시킨다. 트랜잭션 밖에
 <code>nginx/conf.d/default.conf</code>의 기존 <code>location /</code>에는
 <code>proxy_next_upstream error timeout …</code>이 설정되어 있는데,
 이 지시어는 <strong>응답 헤더를 받기 전에만</strong> 동작하므로 스트림 도중 재시도가 발생하지는 않는다.
-다만 위 전용 location을 <code>location /</code>보다 먼저 두어야 매칭이 우선한다.
+현재 전용 경로는 일반 <code>location /</code>보다 긴 prefix라 선언 순서와 관계없이 우선 매칭된다.
 </p>
 
 <p>
 스트림은 어느 인스턴스에 붙어도 되므로 <strong>sticky session 설정은 불필요하다.</strong>
 Redis Pub/Sub이 인스턴스 위치를 무의미하게 만드는 것이 이 설계의 핵심 이점이다.
 </p>
+
+<h3 id="be-deploy">5.7 운영 배포 반영</h3>
+
+<p>GitHub Actions는 이미지를 GHCR에 push한 뒤 운영 서버에 SSH로 접속한다.
+배포에 필요한 파일은 현재 커밋에서 SCP로 덮어쓰고, 민감한 환경변수는
+<code>production</code> Environment Secret의 <code>PROD_ENV_FILE</code>로부터
+<code>.env.deploy</code> 파일을 만들어 권한 <code>600</code>으로 전송한다.</p>
+
+<pre><code>docker-compose.yml
+.env.deploy
+scripts/deploy.sh
+nginx/conf.d/default.conf
+monitoring/</code></pre>
+
+<p><code>nginx/active/upstream.conf</code>는 현재 활성 색을 저장하므로 SCP로 덮어쓰지 않는다.
+파일이 없을 때만 blue로 초기화한다. 실행 중인 nginx가 없으면 <code>deploy.sh</code>가
+최초 배포로 판단해 전체 stack을 <code>docker compose up -d</code>로 기동하고,
+그 이후에는 반대 색 기동 → health 확인 → nginx reload → smoke test 순서로 전환한다.</p>
+
+<pre><code>docker pull "${GHCR_IMAGE}:latest"
+"${DEPLOY_PATH}/scripts/deploy.sh"
+docker image prune -f</code></pre>
 
 <h2 id="frontend">6. 프론트엔드 구현 <span class="tag tag-fe">Vite + React + JS</span></h2>
 
@@ -1181,7 +1220,7 @@ export function NotificationProvider({ children }) {
 
     const ctrl = new AbortController();
 
-    void fetchEventSource('/api/notifications/stream', {
+    void fetchEventSource('/notifications/stream', {
       signal: ctrl.signal,
       headers: { Authorization: `Bearer ${getAccessToken()}` },
 
@@ -1478,7 +1517,7 @@ docker run -d -p 6379:6379 --name nodi-redis-dev redis:7-alpine</code></pre>
 
 <h4>Level 1 — 백엔드 단독 (프론트 없이)</h4>
 
-<pre><code>curl -N -H "Authorization: Bearer &lt;액세스 토큰&gt;" http://localhost:3000/api/notifications/stream</code></pre>
+<pre><code>curl -N -H "Authorization: Bearer &lt;액세스 토큰&gt;" http://localhost:3000/notifications/stream</code></pre>
 
 <p>
 <code>-N</code>이 curl 자체의 버퍼링을 끈다. 20초마다 <code>event: ping</code>이 찍히면 성공.
@@ -1507,11 +1546,11 @@ PORT=3001 npm run start:dev     # 인스턴스 A
 PORT=3002 npm run start:dev     # 인스턴스 B
 
 # A 에 SSE 연결
-curl -N -H "Authorization: Bearer &lt;요청자 토큰&gt;" http://localhost:3001/api/notifications/stream
+curl -N -H "Authorization: Bearer &lt;요청자 토큰&gt;" http://localhost:3001/notifications/stream
 
 # B 로 수락 요청 (다른 터미널)
 curl -X PATCH -H "Authorization: Bearer &lt;수신자 토큰&gt;" \
-     http://localhost:3002/api/connection-requests/&lt;id&gt;/accept</code></pre>
+     http://localhost:3002/connection-requests/&lt;id&gt;/accept</code></pre>
 
 <p>
 <strong>첫 번째 curl에 이벤트가 나타나면 Redis Pub/Sub 교차 전달이 검증된 것이다.</strong>
@@ -1533,7 +1572,7 @@ services:
 
 <pre><code>echo 'set $upstream host.docker.internal:3001;' &gt; nginx/active/upstream.conf
 docker compose up -d nginx
-curl -N http://localhost:8080/api/notifications/stream    # 8080:80 매핑</code></pre>
+curl -N http://localhost:8080/notifications/stream    # 8080:80 매핑</code></pre>
 
 <div class="note">
 <p><strong>검증 후 <code>nginx/active/upstream.conf</code>를 반드시 원래대로 되돌릴 것.</strong>
@@ -1569,19 +1608,22 @@ curl -N http://localhost:8080/api/notifications/stream    # 8080:80 매핑</code
 </table>
 </div>
 
-<h2 id="observability">8. 운영 관측</h2>
+<h2 id="observability">8. 운영 관측 <span class="tag tag-infra">일부 향후 작업</span></h2>
 
 <p>
 현재 모니터링 스택은 <strong>Alloy → Loki → Grafana, 즉 로그 전용</strong>이다
 (<code>provisioning/datasources/loki.yml</code>에 등록된 데이터소스도 Loki 하나뿐).
 Redis의 <code>PUBSUB CHANNELS</code>는 <em>물어봐야</em> 알 수 있는 값이라
 Redis 컨테이너 stdout에는 절대 찍히지 않는다.
-따라서 <strong>앱이 주기적으로 로그에 남기는 방식</strong>으로 관측한다.
-Loki가 로그에서 숫자를 뽑아 시계열로 만들 수 있으므로(<code>unwrap</code>)
-인프라 추가 없이 그래프와 알림이 모두 가능하다.
+현재는 <strong>앱이 30초마다 로그에 남기는 방식</strong>을 적용하고 있다.
+Loki가 로그에서 숫자를 뽑아 시계열로 만들 수 있으므로(<code>unwrap</code>),
+인프라 추가 없이 그래프를 구성한다.
 </p>
 
-<h3 id="obs-logging">8.1 sse_stats 로깅 전략</h3>
+<h3 id="obs-logging">8.1 sse_stats 로깅 전략 <span class="tag tag-infra">적용됨</span></h3>
+
+<p><strong>아래 관측 기능은 현재 구현에 적용되어 있다.</strong>
+<code>NotificationsService</code>의 lifecycle이 주기 로깅을 시작하고 종료 시 타이머를 정리한다.</p>
 
 <h4>무엇을 찍는가</h4>
 
@@ -1601,7 +1643,7 @@ Loki가 로그에서 숫자를 뽑아 시계열로 만들 수 있으므로(<code
     </tr>
     <tr>
       <td><code>redisChannels</code></td><td>Redis 질의</td>
-      <td><code>PUBSUB CHANNELS noti:*</code> 개수 — <strong>전체 인스턴스 합</strong></td>
+      <td><code>PUBSUB CHANNELS noti:*</code> 개수 — Redis 전체의 <strong>활성 채널 이름 수</strong></td>
     </tr>
   </tbody>
 </table>
@@ -1612,33 +1654,45 @@ Loki가 로그에서 숫자를 뽑아 시계열로 만들 수 있으므로(<code
 "커넥션이 많은 것"과 "구독이 새는 것"을 구분할 수 없다.
 </p>
 
-<h4>구현</h4>
+<h4>현재 구현</h4>
 
 <p>
 채널 이름 패턴(<code>noti:*</code>)을 아는 것은 도메인 쪽이므로
 <code>module/notifications/notifications.service.ts</code>에 둔다.
-<code>lib</code>의 <code>RedisPubSubService</code>는 숫자를 세어줄 뿐이다(5.4).
+<code>lib</code>의 <code>RedisPubsubService</code>는 숫자를 세어줄 뿐이다(5.4).
 </p>
 
 <pre><code>@Injectable()
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   private statsTimer?: NodeJS.Timeout;
+  private statsInFlight = false;
 
   onModuleInit() {
     // @nestjs/schedule 을 새로 추가하지 않기 위해 setInterval 사용
     this.statsTimer = setInterval(() =&gt; void this.logStats(), 30_000);
+    this.statsTimer.unref();
   }
 
   private async logStats() {
+    if (this.statsInFlight) return;
+    this.statsInFlight = true;
     try {
-      this.logger.info({
-        evt: 'sse_stats',
-        localChannels: this.pubsub.localChannelCount,           // 이 인스턴스
-        redisChannels: await this.pubsub.countChannels('noti:*'), // 전체 합
-      });
+      this.logger.info(
+        {
+          evt: 'sse_stats',
+          localChannels: this.pubsub.localChannelCount,
+          redisChannels: await this.pubsub.countChannels('noti:*'),
+        },
+        'sse_stats',
+      );
     } catch (e) {
       // 관측 실패가 서비스에 영향을 주면 안 된다
-      this.logger.warn({ evt: 'sse_stats_failed', err: String(e) });
+      this.logger.warn(
+        { evt: 'sse_stats_failed', err: String(e) },
+        'sse_stats_failed',
+      );
+    } finally {
+      this.statsInFlight = false;
     }
   }
 
@@ -1667,13 +1721,13 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       얻는 것에 비해 복잡하다. 쿼리에서 <code>max()</code>로 집계한다.</li>
 </ul>
 
-<h3 id="obs-panels">8.2 Grafana 패널</h3>
+<h3 id="obs-panels">8.2 Grafana 패널 <span class="tag tag-infra">적용됨</span></h3>
 
 <p><strong>인스턴스별 활성 채널 수</strong></p>
 
 <pre><code>sum by (container) (
   last_over_time(
-    {service=~"backend_.+"} |= "sse_stats" | json | unwrap localChannels [1m]
+    {service=~"backend_.+"} |= "sse_stats" | json | evt="sse_stats" | unwrap localChannels [1m]
   )
 )</code></pre>
 
@@ -1681,13 +1735,14 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
 <pre><code>max(
   last_over_time(
-    {service=~"backend_.+"} |= "sse_stats" | json | unwrap redisChannels [1m]
+    {service=~"backend_.+"} |= "sse_stats" | json | evt="sse_stats" | unwrap redisChannels [1m]
   )
 )</code></pre>
 
 <p>
 <code>|= "sse_stats"</code>를 <code>| json</code> <strong>앞</strong>에 두는 것이 중요하다.
-라인 필터가 인덱스 단계에서 먼저 걸러 JSON 파싱 비용을 크게 줄인다.
+라인 필터가 먼저 범위를 줄이고, <code>evt="sse_stats"</code>가
+<code>sse_stats_failed</code> 경고를 제외한다.
 기존 <code>rules.yml</code>의 nginx 5xx 규칙과 같은 패턴이다.
 </p>
 
@@ -1719,7 +1774,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 </table>
 </div>
 
-<h3 id="obs-alert">8.3 알림 규칙</h3>
+<h3 id="obs-alert">8.3 알림 규칙 <span class="tag tag-infra">향후 작업</span></h3>
 
 <p>
 기존 <code>provisioning/alerting/rules.yml</code>의 구조를 그대로 따른다
@@ -1835,7 +1890,7 @@ Prometheus라면 <code>up{job="redis"} == 0</code>으로 <em>죽었다는 사실
     <tr>
       <td><span class="tag tag-be">BE</span></td>
       <td><strong>전역 <code>TransformInterceptor</code>가 SSE 프레임을 감싸 <code>event:</code> 이름을 지운다</strong></td>
-      <td>구현 전 <code>APP_INTERCEPTOR</code> + <code>Reflector</code>로 SSE 라우트 예외 처리 (<a href="#be-controller">5.3</a>).
+      <td><code>APP_INTERCEPTOR</code> + <code>Reflector</code>로 SSE 라우트를 예외 처리함 (<a href="#be-controller">5.3</a>).
           이 수정 없이는 기능 전체가 조용히 실패한다</td>
     </tr>
     <tr>
@@ -1910,16 +1965,15 @@ Prometheus라면 <code>up{job="redis"} == 0</code>으로 <em>죽었다는 사실
   <li><code>module/notifications/</code> — controller · service · repository · module (<a href="#be-layout">5.1</a>)</li>
   <li><code>@Sse('stream')</code> 엔드포인트 + <code>@Auth(UserRole.ADMIN, UserRole.USER)</code> + 20초 heartbeat</li>
   <li><code>takeUntil(timer(30분))</code>으로 스트림 수명 제한 → 주기적 재인증 (<a href="#be-controller">5.3</a>)</li>
-  <li>목록 / 읽음 처리 / 전체 읽음 API</li>
+  <li>페이지 기반 목록 API(<code>isRead</code> 필터) / 단건 읽음 처리 API</li>
   <li><code>acceptRequest()</code> · <code>rejectRequest()</code>에 알림 생성 후킹 (트랜잭션 밖)</li>
-  <li>nginx location 블록 추가 — <code>location /</code>보다 <strong>위에</strong> 배치 (<a href="#be-nginx">5.6</a>)</li>
-  <li><code>sse_stats</code> 30초 주기 로깅 (<code>localChannels</code> + <code>redisChannels</code>, <code>pub</code> 커넥션 사용)</li>
+  <li>nginx SSE 전용 location + 내부·앞단 nginx 버퍼링 해제 (<a href="#be-nginx">5.6</a>)</li>
 </ul>
 
 <h3><span class="tag tag-infra">관측</span></h3>
 <ul class="checklist">
-  <li>Grafana 패널 — <code>localChannels</code>(인스턴스별) + <code>redisChannels</code>(전체) 겹쳐 그리기 (<a href="#obs-panels">8.2</a>)</li>
-  <li><code>rules.yml</code>에 <code>nodi-sse-channel-leak</code> 규칙 추가 (<code>for: 30m</code>, 임계값은 운영 관찰 후 결정)</li>
+  <li><strong>적용됨:</strong> <code>sse_stats</code> 30초 주기 로깅과 Grafana 패널 (<a href="#obs-panels">8.2</a>)</li>
+  <li><strong>향후:</strong> <code>rules.yml</code>의 <code>nodi-sse-channel-leak</code> 규칙</li>
   <li>Prometheus는 도입하지 않음 — 근거와 트리거는 <a href="#obs-prometheus">8.4</a></li>
 </ul>
 

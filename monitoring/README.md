@@ -189,6 +189,26 @@ sum(rate({service=~"backend_.+", level="error"}[1m]))
 > 안 그러면 로그 한 줄이 각각 별개 시계열이 돼서 분위수가 계산되지 않습니다
 > (대시보드 "응답시간" 패널 참고).
 
+### SSE 채널 수
+
+백엔드 각 인스턴스는 30초마다 `sse_stats` 로그를 남깁니다.
+
+| 필드            | 뜻                                        |
+| --------------- | ----------------------------------------- |
+| `localChannels` | 해당 인스턴스가 보유한 `noti:*` 채널 수   |
+| `redisChannels` | Redis 전체에서 구독 중인 `noti:*` 채널 수 |
+
+대시보드의 **SSE 채널 수 (로컬 / Redis)** 패널은 인스턴스별 로컬 값, 로컬 합계,
+Redis 전체 값을 함께 표시합니다. 정상 상태에서는 `redisChannels`와 로컬 합계가 대체로 같아야
+합니다. Redis 전체만 지속적으로 커지면 SSE 종료 시 구독 해제가 누락되는지 확인하세요.
+
+```logql
+{service=~"backend_.+"} |= "sse_stats" | json | evt="sse_stats"
+```
+
+`|= "sse_stats"`를 `| json` 앞에 두어 관련 로그만 먼저 거르고, 정확한 이벤트 이름으로
+한 번 더 필터링해 `sse_stats_failed` 경고 로그를 제외합니다.
+
 ## Logs Drilldown (쿼리 없이 훑어보기)
 
 왼쪽 **Drilldown → Logs**. Explore 가 LogQL 을 직접 쓰는 곳이라면, Drilldown 은 라벨·필드 분포를

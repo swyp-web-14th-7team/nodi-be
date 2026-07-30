@@ -219,10 +219,68 @@
       }
     },
     {
+      "type": "timeseries",
+      "title": "SSE 채널 수 (로컬 / Redis)",
+      "description": "인스턴스별 localChannels와 그 합계를 Redis 전체 redisChannels와 비교합니다. local 합계와 Redis 전체가 지속적으로 벌어지면 구독 해제 누수를 확인하세요.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "queryType": "range",
+          "legendFormat": "{{container}} local",
+          "expr": "sum by (container) (last_over_time({service=~\"backend_.+\"} |= \"sse_stats\" | json | evt=\"sse_stats\" | unwrap localChannels [1m]))"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "queryType": "range",
+          "legendFormat": "local 합계",
+          "expr": "sum(last_over_time({service=~\"backend_.+\"} |= \"sse_stats\" | json | evt=\"sse_stats\" | unwrap localChannels [1m]))"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "queryType": "range",
+          "legendFormat": "Redis 전체",
+          "expr": "max(last_over_time({service=~\"backend_.+\"} |= \"sse_stats\" | json | evt=\"sse_stats\" | unwrap redisChannels [1m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          },
+          "color": { "mode": "palette-classic" },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
       "type": "logs",
       "title": "에러 로그",
       "description": "한 줄 요약만 표시. 줄을 클릭하면 req_id·url·상태코드 등 payload 가 펼쳐짐",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
@@ -248,7 +306,7 @@
       "type": "logs",
       "title": "백엔드 전체 로그",
       "description": "요청 로그는 'GET /url → 200 (12ms)' 로, 그 외 앱 로그는 msg 로 한 줄 표시. 클릭하면 필드별 payload 를 볼 수 있고, 값 옆 돋보기로 그 값만 필터링 가능",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 30 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
@@ -280,6 +338,6 @@
   "timezone": "browser",
   "title": "nodi-be 로그",
   "uid": "nodi-be-logs",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }
