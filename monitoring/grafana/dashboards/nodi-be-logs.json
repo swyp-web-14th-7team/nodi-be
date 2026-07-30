@@ -305,7 +305,7 @@
     {
       "type": "logs",
       "title": "백엔드 전체 로그",
-      "description": "요청 로그는 'GET /url → 200 (12ms)' 로, 그 외 앱 로그는 msg 로 한 줄 표시. 클릭하면 필드별 payload 를 볼 수 있고, 값 옆 돋보기로 그 값만 필터링 가능",
+      "description": "정상 sse_stats 주기 로그는 제외합니다. 요청 로그는 'GET /url → 200 (12ms)' 로, 그 외 앱 로그는 msg 로 한 줄 표시합니다.",
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 30 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
@@ -314,7 +314,7 @@
           "datasource": { "type": "loki", "uid": "loki" },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service=~\"backend_.+\"} | json | line_format \"{{if .req_method}}{{.req_method}} {{.req_url}} → {{.res_statusCode}} ({{.responseTime}}ms){{else}}{{.msg}}{{end}}{{if .user_nickname}} [{{.user_nickname}}]{{end}}\""
+          "expr": "{service=~\"backend_.+\"} | json | evt!=\"sse_stats\" | line_format \"{{if .req_method}}{{.req_method}} {{.req_url}} → {{.res_statusCode}} ({{.responseTime}}ms){{else}}{{.msg}}{{end}}{{if .user_nickname}} [{{.user_nickname}}]{{end}}\""
         }
       ],
       "options": {
@@ -338,6 +338,6 @@
   "timezone": "browser",
   "title": "nodi-be 로그",
   "uid": "nodi-be-logs",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }
