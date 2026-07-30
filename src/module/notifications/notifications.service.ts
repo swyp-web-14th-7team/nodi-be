@@ -1,4 +1,10 @@
-import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  MessageEvent,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { RedisPubsubService } from '@/lib/redis/redis-pubsub.service';
 import { NotificationsRepository } from '@/module/notifications/notifications.repository';
 import { map, Observable } from 'rxjs';
@@ -9,13 +15,29 @@ import { FindAllNotificationsDto } from '@/module/notifications/dto/find-all-not
 import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements OnModuleInit, OnModuleDestroy {
+  private static readonly STATS_INTERVAL_MS = 30_000;
+  private statsTimer?: NodeJS.Timeout;
+  private statsInFlight = false;
+
   constructor(
     private readonly pubsub: RedisPubsubService,
     private readonly notificationRepository: NotificationsRepository,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(NotificationsService.name);
+  }
+
+  onModuleInit(): void {
+    this.statsTimer = setInterval(
+      () => void this.logStats(),
+      NotificationsService.STATS_INTERVAL_MS,
+    );
+    this.statsTimer.unref();
+  }
+
+  onModuleDestroy(): void {
+    if (this.statsTimer) clearInterval(this.statsTimer);
   }
 
   private channelOf(userId: string) {
@@ -46,6 +68,7 @@ export class NotificationsService {
     } catch (e) {
       this.logger.warn(
         {
+          evt: 'noti_publish_failed',
           id: noti.id,
           err: String(e),
         },
@@ -70,5 +93,28 @@ export class NotificationsService {
 
     if (target.readAt === null)
       await this.notificationRepository.update(id, { readAt: new Date() });
+  }
+
+  private async logStats(): Promise<void> {
+    if (this.statsInFlight) return;
+    this.statsInFlight = true;
+
+    try {
+      this.logger.info(
+        {
+          evt: 'sse_stats',
+          localChannels: this.pubsub.localChannelCount,
+          redisChannels: await this.pubsub.countChannels('noti:*'),
+        },
+        'sse_stats',
+      );
+    } catch (e) {
+      this.logger.warn(
+        { evt: 'sse_stats_failed', err: String(e) },
+        'sse_stats_failed',
+      );
+    } finally {
+      this.statsInFlight = false;
+    }
   }
 }
