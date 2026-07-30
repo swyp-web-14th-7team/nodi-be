@@ -4,7 +4,8 @@ import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from '@/module/auth/auth.module';
 import { UsersModule } from '@/module/users/users.module';
-import { LoggerModule } from '@/lib/logger/logger.module';
+import { LoggerModule as PinoLoggerModule } from 'nestjs-pino';
+import { pinoLoggerParams } from '@/lib/logger/logger.params';
 import 'dotenv/config';
 import { PrismaModule } from '@/lib/prisma/prisma.module';
 import { ProfileCardsModule } from '@/module/profile-cards/profile-cards.module';
@@ -22,6 +23,7 @@ import { CardBackgroundImagesModule } from '@/module/card-background-images/card
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TransformInterceptor } from '@/common/interceptor/transform.interceptor';
 import { NotificationsModule } from '@/module/notifications/notifications.module';
+import { WebpageModule } from '@/module/webpage/webpage.module';
 
 @Module({
   imports: [
@@ -29,7 +31,7 @@ import { NotificationsModule } from '@/module/notifications/notifications.module
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    LoggerModule,
+    PinoLoggerModule.forRoot(pinoLoggerParams),
     AuthModule,
     UsersModule,
     ProfileCardsModule,
@@ -45,6 +47,7 @@ import { NotificationsModule } from '@/module/notifications/notifications.module
     ConnectionsModule,
     CardBackgroundImagesModule,
     NotificationsModule,
+    WebpageModule,
   ],
   controllers: [AppController],
   providers: [

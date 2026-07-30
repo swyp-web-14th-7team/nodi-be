@@ -80,7 +80,8 @@ Prisma 예외는 `PrismaExceptionFilter`가 적절한 HTTP 상태로 변환합�
 
 ## 로깅
 
-`nestjs-pino` 기반 구조적(JSON) 로깅입니다. (`src/lib/logger/logger.module.ts`)
+`nestjs-pino` 기반 구조적(JSON) 로깅입니다. 설정은 `src/lib/logger/logger.params.ts`에
+모아두고, `LoggerModule.forRoot()`는 `AppModule`에서 호출합니다.
 
 - **요청 추적**: 요청마다 ULID `req.id`를 발급하고 `X-Request-Id` 헤더로 응답합니다.
   기존 `X-Request-Id`가 있으면 재사용하므로 nginx→백엔드 간 요청을 한 ID로 묶을 수 있습니다.
