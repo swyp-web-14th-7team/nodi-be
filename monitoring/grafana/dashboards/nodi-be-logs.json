@@ -221,7 +221,7 @@
     {
       "type": "timeseries",
       "title": "SSE 채널 수 (로컬 / Redis)",
-      "description": "인스턴스별 localChannels와 그 합계를 Redis 전체 redisChannels와 비교합니다. local 합계와 Redis 전체가 지속적으로 벌어지면 구독 해제 누수를 확인하세요.",
+      "description": "인스턴스별 localChannels와 그 합계를 Redis 전체 redisChannels와 비교합니다. local 합계와 Redis 전체가 지속적으로 벌어지면 구독 해제 누수를 확인하세요. localChannels/redisChannels는 게이지이므로 인스턴스 단위는 max로 최신값을 고른 뒤 합산해야 합니다. sum by (container)를 쓰면 같은 컨테이너에 스트림이 둘일 때 값이 배로 보입니다.",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
@@ -231,7 +231,7 @@
           "editorMode": "code",
           "queryType": "range",
           "legendFormat": "{{container}} local",
-          "expr": "sum by (container) (last_over_time({service=~\"backend_.+\"} |= \"sse_stats\" | json | evt=\"sse_stats\" | unwrap localChannels [1m]))"
+          "expr": "max by (container) (last_over_time({service=~\"backend_.+\"} |= \"sse_stats\" | json | evt=\"sse_stats\" | unwrap localChannels [1m]))"
         },
         {
           "refId": "B",
@@ -239,7 +239,7 @@
           "editorMode": "code",
           "queryType": "range",
           "legendFormat": "local 합계",
-          "expr": "sum(last_over_time({service=~\"backend_.+\"} |= \"sse_stats\" | json | evt=\"sse_stats\" | unwrap localChannels [1m]))"
+          "expr": "sum(max by (container) (last_over_time({service=~\"backend_.+\"} |= \"sse_stats\" | json | evt=\"sse_stats\" | unwrap localChannels [1m])))"
         },
         {
           "refId": "C",
