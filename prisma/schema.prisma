@@ -352,14 +352,14 @@ model CardConnection {
 model Notification {
   id String @id @default(ulid()) @db.Char(26)
 
-  userId String @db.Char(26) @map("user_id")
+  userId String @map("user_id") @db.Char(26)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type    Int  @db.TinyInt // 1: CONNECTION_ACCEPTED, 2: CONNECTION_REJECTED
+  type    Int  @db.TinyInt // 1: CONNECTION_ACCEPTED, 2: CONNECTION_REJECTED, 3: CONNECTION_REQUESTED
   payload Json // 알림 내용
 
   readAt    DateTime? @map("read_at") @db.DateTime(3)
-  createdAt DateTime  @default(now()) @db.DateTime(3) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
 
   @@index([userId, createdAt])
   @@index([userId, readAt])

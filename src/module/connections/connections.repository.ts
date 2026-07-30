@@ -5,6 +5,8 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 import { displayProfileCardIncludeOptions } from '@/module/profile-cards/profile-cards.type';
 import {
+  CardOwnership,
+  cardOwnershipSelectOptions,
   ConnectionRequestWithParties,
   ReceivedConnectionRequest,
   receivedRequestIncludeOptions,
@@ -14,9 +16,6 @@ import {
 } from '@/module/connections/connection-request.type';
 import { ConnectionRequestStatus } from '@/module/connections/type/connection-request-status.enum';
 import { toCardSnapshot } from '@/module/connections/connections.type';
-
-// 카드 소유자·활성 여부 확인용 최소 조회 결과
-export type CardOwnership = { id: string; userId: string; isActive: boolean };
 
 @Injectable()
 export class ConnectionsRepository {
@@ -28,7 +27,7 @@ export class ConnectionsRepository {
   async findCardOwnership(cardId: string): Promise<CardOwnership | null> {
     return this.prismaService.userProfileCard.findUnique({
       where: { id: cardId },
-      select: { id: true, userId: true, isActive: true },
+      select: cardOwnershipSelectOptions,
     });
   }
 
