@@ -6,10 +6,9 @@ import { ConnectionsRepository } from '@/module/connections/connections.reposito
 import { ConnectionRequestsController } from '@/module/connections/connection-requests.controller';
 import { UsersModule } from '@/module/users/users.module';
 import { NotificationsModule } from '@/module/notifications/notifications.module';
-import { LoggerModule } from '@/lib/logger/logger.module';
 
 @Module({
-  imports: [UsersModule, NotificationsModule, LoggerModule],
+  imports: [UsersModule, NotificationsModule],
   providers: [
     ConnectionsService,
     ConnectionRequestsService,
