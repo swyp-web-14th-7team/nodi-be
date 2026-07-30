@@ -145,7 +145,7 @@ jobs:
           username: ${{ secrets.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
           fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
-          source: docker-compose.yml,.env.deploy,scripts/deploy.sh,nginx/conf.d/default.conf,monitoring
+          source: docker-compose.yml,.env.deploy,scripts/deploy.sh,nginx/conf.d/default.conf,monitoring,public
           target: ${{ vars.PROD_DEPLOY_PATH }}
           overwrite: true
 
