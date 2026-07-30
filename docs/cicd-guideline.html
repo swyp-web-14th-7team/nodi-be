@@ -1,0 +1,2131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CI/CD 표준 가이드라인</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1c1e21;
+    --muted: #5c6470;
+    --line: #e3e6ea;
+    --code-bg: #f6f7f9;
+    --code-head: #eef0f3;
+    --accent: #2f6feb;
+    --accent-soft: #eaf1ff;
+    --docker: #0d9488;
+    --pm2: #7c3aed;
+    --warn-bg: #fff8e6;
+    --warn-line: #e0a800;
+    --danger-bg: #fdecec;
+    --danger-line: #d9534f;
+    --table-head: #f6f7f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e4e6eb;
+      --muted: #9aa2ad;
+      --line: #2c3038;
+      --code-bg: #1e2127;
+      --code-head: #23272f;
+      --accent: #6ea0ff;
+      --accent-soft: #1d2635;
+      --docker: #3fd0c0;
+      --pm2: #b18cff;
+      --warn-bg: #2a2416;
+      --warn-line: #b08800;
+      --danger-bg: #2c1a1a;
+      --danger-line: #e07b76;
+      --table-head: #1e2127;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    padding: 40px 24px 120px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo",
+                 "Malgun Gothic", "Segoe UI", sans-serif;
+    line-height: 1.75;
+    font-size: 15px;
+  }
+
+  /* ---------- 레이아웃 ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: 246px minmax(0, 1fr);
+    gap: 56px;
+    max-width: 1220px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  main { min-width: 0; max-width: 880px; }
+
+  /* ---------- 목차 ---------- */
+  .toc {
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    padding-right: 8px;
+    border-right: 1px solid var(--line);
+  }
+  .toc-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--muted); text-transform: uppercase;
+    margin: 0 0 12px; padding-left: 10px;
+  }
+  .toc ul { list-style: none; margin: 0; padding: 0; }
+  .toc li { margin: 0; }
+  .toc a {
+    display: block;
+    padding: 5px 10px;
+    color: var(--muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    border-radius: 0 4px 4px 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .toc a:hover { color: var(--fg); background: var(--code-bg); }
+  .toc > ul > li > a { font-weight: 600; color: var(--fg); margin-top: 6px; }
+  .toc .sub a { padding-left: 22px; font-size: 12.5px; }
+  .toc a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .toc::-webkit-scrollbar { width: 6px; }
+  .toc::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+  @media (max-width: 1040px) {
+    .layout { grid-template-columns: 1fr; gap: 24px; }
+    .toc {
+      position: static; max-height: 240px;
+      border: 1px solid var(--line); border-radius: 8px;
+      padding: 14px 6px; margin-bottom: 16px;
+    }
+  }
+
+  /* ---------- 본문 ---------- */
+  h1 { font-size: 30px; line-height: 1.3; margin: 0 0 8px; letter-spacing: -0.02em; }
+  h2 {
+    font-size: 21px; margin: 56px 0 16px; padding-top: 24px;
+    border-top: 1px solid var(--line); letter-spacing: -0.01em;
+    scroll-margin-top: 24px;
+  }
+  h3 { font-size: 16px; margin: 32px 0 10px; scroll-margin-top: 24px; }
+  h4 {
+    font-size: 14px; margin: 24px 0 8px; color: var(--muted);
+    font-weight: 700; letter-spacing: 0.01em;
+  }
+  p { margin: 12px 0; }
+  ul, ol { padding-left: 22px; margin: 12px 0; }
+  li { margin: 6px 0; }
+  a { color: var(--accent); }
+
+  .subtitle { color: var(--muted); margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+
+  code {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    padding: 2px 5px;
+    border-radius: 4px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    line-height: 1.6;
+    margin: 16px 0;
+  }
+  pre code { background: none; padding: 0; font-size: 13px; }
+
+  /* ---------- 복사 가능한 코드 블록 ---------- */
+  .code-block { margin: 16px 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .code-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--code-head);
+    border-bottom: 1px solid var(--line);
+    padding: 7px 10px 7px 14px;
+  }
+  .code-file {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px; color: var(--muted); font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .copy-btn {
+    flex: none;
+    font-family: inherit; font-size: 12px; font-weight: 600;
+    color: var(--muted); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 5px;
+    padding: 3px 10px; cursor: pointer;
+    transition: color .12s, border-color .12s;
+  }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .copy-btn.done { color: var(--docker); border-color: var(--docker); }
+  .copy-btn.fail { color: var(--danger-line); border-color: var(--danger-line); }
+  .code-block pre { margin: 0; border: none; border-radius: 0; }
+
+  .scroll { overflow-x: auto; margin: 16px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 520px; }
+  th, td { border: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--table-head); font-weight: 600; }
+
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 7px; border-radius: 4px; vertical-align: middle;
+  }
+  .tag-docker { color: var(--docker); border: 1px solid var(--docker); }
+  .tag-pm2 { color: var(--pm2); border: 1px solid var(--pm2); }
+  .tag-common { color: var(--muted); border: 1px solid var(--muted); }
+
+  .note {
+    background: var(--warn-bg);
+    border-left: 3px solid var(--warn-line);
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 16px 0;
+  }
+  .danger {
+    background: var(--danger-bg);
+    border-left: 3px solid var(--danger-line);
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 16px 0;
+  }
+  .note p:first-child, .danger p:first-child { margin-top: 0; }
+  .note p:last-child, .danger p:last-child { margin-bottom: 0; }
+
+  .flow { margin: 20px 0; }
+  .flow-row {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .flow-row:last-child { border-bottom: none; }
+  .flow-no {
+    font-size: 12px; font-weight: 700; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 50%;
+    width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+  .flow-body { min-width: 0; }
+  .flow-lane { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .flow-desc .sub { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  .lane-ci { color: var(--accent); }
+  .lane-docker { color: var(--docker); }
+  .lane-pm2 { color: var(--pm2); }
+  .lane-both { color: var(--muted); }
+
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li { padding-left: 26px; position: relative; }
+  .checklist li::before { content: "\2610"; position: absolute; left: 4px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<nav class="toc" aria-label="목차">
+  <p class="toc-title">목차</p>
+  <ul>
+    <li><a href="#overview">1. 개요</a>
+      <ul class="sub">
+        <li><a href="#principles">1.1 표준 플로우 원칙</a></li>
+        <li><a href="#stages">1.2 파이프라인 단계</a></li>
+        <li><a href="#choose">1.3 배포 방식 선택</a></li>
+      </ul>
+    </li>
+    <li><a href="#common">2. 공통 규칙</a>
+      <ul class="sub">
+        <li><a href="#branch">2.1 브랜치와 트리거</a></li>
+        <li><a href="#concurrency">2.2 concurrency</a></li>
+        <li><a href="#version-gate">2.3 버전 게이트</a></li>
+        <li><a href="#secrets">2.4 시크릿과 변수</a></li>
+        <li><a href="#switch">2.5 무중단 전환 원리</a></li>
+        <li><a href="#contract">2.6 헬스체크·스모크·롤백 계약</a></li>
+        <li><a href="#pr-check">2.7 PR 검사 템플릿</a></li>
+      </ul>
+    </li>
+    <li><a href="#docker">3. Docker 배포</a>
+      <ul class="sub">
+        <li><a href="#docker-files">3.1 파일 구성</a></li>
+        <li><a href="#docker-workflow">3.2 배포 워크플로</a></li>
+        <li><a href="#dockerfile">3.3 Dockerfile</a></li>
+        <li><a href="#docker-compose">3.4 docker-compose.yml</a></li>
+        <li><a href="#docker-nginx">3.5 nginx 설정</a></li>
+        <li><a href="#docker-deploy">3.6 배포 스크립트</a></li>
+        <li><a href="#docker-bootstrap">3.7 서버 최초 세팅</a></li>
+        <li><a href="#docker-manual">3.8 수동 배포·롤백</a></li>
+      </ul>
+    </li>
+    <li><a href="#pm2">4. PM2 배포</a>
+      <ul class="sub">
+        <li><a href="#pm2-files">4.1 파일 구성</a></li>
+        <li><a href="#pm2-workflow">4.2 배포 워크플로</a></li>
+        <li><a href="#pm2-ecosystem">4.3 ecosystem.config.js</a></li>
+        <li><a href="#pm2-nginx">4.4 nginx 설정</a></li>
+        <li><a href="#pm2-deploy">4.5 배포 스크립트</a></li>
+        <li><a href="#pm2-bootstrap">4.6 서버 최초 세팅</a></li>
+        <li><a href="#pm2-manual">4.7 수동 롤백</a></li>
+        <li><a href="#pm2-reload">4.8 pm2 reload 로 충분한 경우</a></li>
+      </ul>
+    </li>
+    <li><a href="#checklist">5. 신규 레포 도입 체크리스트</a></li>
+    <li><a href="#pitfalls">6. 자주 나는 실수</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<h1>CI/CD 표준 가이드라인</h1>
+<p class="subtitle">
+  PR 검사 → 버전 게이트 → 빌드 → 무중단 배포(Blue-Green) → 헬스체크 → 스모크 테스트 → 롤백.
+  사내 모든 서비스는 이 플로우를 따른다.
+</p>
+<p class="meta">
+  작성일 2026-07-30 · 기준 구현 <code>nodi-be</code> (GitHub Actions / GHCR / nginx) ·
+  Node.js 22 · 배포 방식 <span class="tag tag-docker">Docker</span> <span class="tag tag-pm2">PM2</span>
+</p>
+
+<h2 id="overview">1. 개요</h2>
+
+<p>
+배포 방식(Docker / PM2)은 팀이 고를 수 있지만 <strong>플로우와 안전장치는 고정</strong>이다.
+어떤 레포를 열어도 같은 순서, 같은 파일 이름, 같은 실패 동작을 기대할 수 있어야 한다.
+아래 3절·4절의 템플릿은 그 플로우를 각 방식으로 구현한 것이며, 복사해서 바로 쓰도록 되어 있다.
+</p>
+
+<h3 id="principles">1.1 표준 플로우 원칙</h3>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>원칙</th><th>내용</th><th>이유</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PR 에서 전부 막는다</td>
+      <td>format · lint · test · build 를 PR 에서 실행하고, main 에서는 다시 검사하지 않는다</td>
+      <td>main 은 이미 검증된 커밋만 들어온다. 배포 경로를 짧게 유지</td>
+    </tr>
+    <tr>
+      <td>배포 트리거는 main push 하나</td>
+      <td>수동 배포는 <code>workflow_dispatch</code> 로만 허용</td>
+      <td>배포된 코드 = main 이라는 등식을 깨지 않는다</td>
+    </tr>
+    <tr>
+      <td>버전이 곧 릴리스 식별자</td>
+      <td><code>package.json</code> 의 <code>version</code> 이 중복이면 빌드 전에 실패</td>
+      <td>같은 버전 두 개가 존재하면 무엇이 배포됐는지 추적 불가</td>
+    </tr>
+    <tr>
+      <td>전환 전에 검증</td>
+      <td>새 색이 <strong>전부 healthy</strong> 가 된 뒤에만 트래픽을 옮긴다</td>
+      <td>실패해도 사용자 영향 0. 현재 색은 손대지 않은 상태로 남는다</td>
+    </tr>
+    <tr>
+      <td>전환 후에도 검증</td>
+      <td>nginx 를 통과하는 스모크 테스트가 실패하면 자동 롤백</td>
+      <td>컨테이너는 healthy 인데 프록시 경로가 깨진 경우를 잡는다</td>
+    </tr>
+    <tr>
+      <td>이전 버전을 지우지 않는다</td>
+      <td>이전 색은 <code>stop</code> 까지만. 삭제하지 않는다</td>
+      <td>재빌드 없이 즉시 롤백. 직전 1버전은 항상 살아 있다</td>
+    </tr>
+    <tr>
+      <td>비밀은 레포에 없다</td>
+      <td>운영 <code>.env</code> 는 <code>production</code> Environment Secret 에서 배포 시점에 생성</td>
+      <td>레포 열람 권한과 운영 비밀 접근 권한을 분리</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="stages">1.2 파이프라인 단계</h3>
+
+<div class="flow">
+  <div class="flow-row">
+    <div class="flow-no">1</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-ci">PR 열림 · 갱신</div>
+      <div class="flow-desc">
+        <code>pr-check.yml</code> — format:check, lint:check, test:ci, build
+        <span class="sub">하나라도 실패하면 머지 불가. 같은 PR 에 새 커밋이 오면 이전 실행은 취소한다.</span>
+      </div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">2</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-ci">main 에 머지</div>
+      <div class="flow-desc">
+        버전 게이트 — <code>package.json</code> 의 <code>version</code> 이 이미 릴리스됐는지 확인
+        <span class="sub">Docker 는 GHCR 태그 조회, PM2 는 git 태그 조회. 중복이면 빌드 잡이 시작되지 않는다.</span>
+      </div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">3</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-docker">Docker</div>
+      <div class="flow-desc">
+        이미지 빌드 → GHCR push (<code>latest</code>, <code>sha-...</code>, <code>v1.2.3</code>)
+        <span class="sub">배포 산출물이 레지스트리에 남는다. 롤백·재배포 때 다시 빌드하지 않는다.</span>
+      </div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">3</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-pm2">PM2</div>
+      <div class="flow-desc">
+        <code>dist</code> 번들 빌드 → tar 아티팩트 업로드
+        <span class="sub">네이티브 모듈·Prisma 엔진은 플랫폼에 묶이므로 <code>node_modules</code> 는 넣지 않고 서버에서 설치한다.</span>
+      </div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">4</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-both">배포 (SSH)</div>
+      <div class="flow-desc">
+        <code>.env.deploy</code> 생성 → 배포 파일 SCP → 서버의 <code>deploy.sh</code> 실행
+        <span class="sub"><code>production</code> Environment 를 쓰므로 승인 규칙을 붙일 수 있다.</span>
+      </div>
+    </div>
+  </div>
+  <div class="flow-row">
+    <div class="flow-no">5</div>
+    <div class="flow-body">
+      <div class="flow-lane lane-both">Blue-Green 전환</div>
+      <div class="flow-desc">
+        반대 색 기동 → <strong>헬스체크</strong> → upstream 파일 교체 → nginx reload → <strong>스모크 테스트</strong> → 이전 색 stop
+        <span class="sub">헬스체크 실패는 배포 취소(영향 0), 스모크 실패는 자동 롤백.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 id="choose">1.3 배포 방식 선택</h3>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th></th><th><span class="tag tag-docker">Docker</span></th><th><span class="tag tag-pm2">PM2</span></th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>기본값</td>
+      <td><strong>새 서비스는 이쪽</strong></td>
+      <td>기존 서버 · 단일 인스턴스 · 도커 설치가 불가한 환경</td>
+    </tr>
+    <tr>
+      <td>런타임 재현성</td>
+      <td>이미지에 고정 — 러너와 서버가 같은 것을 실행</td>
+      <td>서버의 Node·glibc 버전에 의존</td>
+    </tr>
+    <tr>
+      <td>롤백 단위</td>
+      <td>이미지 태그 (과거 전체 버전)</td>
+      <td>릴리스 디렉터리 (기본 최근 5개)</td>
+    </tr>
+    <tr>
+      <td>부수 서비스(Redis 등)</td>
+      <td>compose 에 함께 선언</td>
+      <td>서버에 직접 설치·관리</td>
+    </tr>
+    <tr>
+      <td>서버 준비물</td>
+      <td>docker, docker compose</td>
+      <td>node, pm2, nginx, sudoers 규칙</td>
+    </tr>
+    <tr>
+      <td>배포 시간</td>
+      <td>이미지 pull (레이어 캐시)</td>
+      <td>서버에서 <code>npm ci</code> 하므로 더 길다</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="common">2. 공통 규칙</h2>
+
+<h3 id="branch">2.1 브랜치와 트리거</h3>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>브랜치</th><th>역할</th><th>실행되는 워크플로</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>main</code></td><td>운영에 배포된 코드</td><td>배포 워크플로 (push 시)</td></tr>
+    <tr><td><code>develop</code></td><td>통합 브랜치. 여기서 main 으로 PR</td><td>—</td></tr>
+    <tr><td>feature/*</td><td>작업 브랜치</td><td>PR 검사 (PR 열릴 때)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+main 브랜치에는 <strong>직접 push 를 막고</strong> PR 검사를 required status check 로 지정한다
+(Settings → Branches → Branch protection rules).
+</p>
+
+<h3 id="concurrency">2.2 concurrency</h3>
+
+<p>두 워크플로의 <code>cancel-in-progress</code> 값이 <strong>반대</strong>인 것이 핵심이다.</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>워크플로</th><th>group</th><th>cancel-in-progress</th><th>이유</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PR 검사</td>
+      <td><code>pr-check-${PR번호}</code></td>
+      <td><code>true</code></td>
+      <td>새 커밋이 오면 옛 커밋 검사는 의미가 없다. 러너 시간 절약</td>
+    </tr>
+    <tr>
+      <td>배포</td>
+      <td><code>build-and-deploy-${ref}</code></td>
+      <td><code>false</code></td>
+      <td>취소되면 <strong>blue-green 전환이 중간에 끊긴다</strong>. upstream 은 새 색인데 헬스체크 전이거나, 이전 색이 안 내려간 상태로 남는다</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="version-gate">2.3 버전 게이트</h3>
+
+<p>
+<code>package.json</code> 의 <code>version</code> 을 올리지 않고 머지하면 <strong>빌드 전에 실패</strong>한다.
+검사만 하는 잡을 따로 두고 <code>needs</code> 로 묶어서, 중복이면 비싼 빌드 잡이 아예 시작되지 않게 한다.
+</p>
+
+<ul>
+  <li><span class="tag tag-docker">Docker</span> <code>docker manifest inspect</code> 로 GHCR 에 <code>v{version}</code> 태그가 있는지 확인</li>
+  <li><span class="tag tag-pm2">PM2</span> <code>git ls-remote --tags</code> 로 <code>v{version}</code> 태그가 있는지 확인 → 배포 성공 후 태그 push</li>
+</ul>
+
+<div class="note">
+<p>
+버전 표기는 <code>v</code> 접두사를 붙인다(<code>v1.2.3</code>). 이미지 태그·git 태그·릴리스 노트에서 같은 문자열을 쓴다.
+</p>
+</div>
+
+<h3 id="secrets">2.4 시크릿과 변수</h3>
+
+<p>
+배포 잡은 <code>environment: production</code> 을 지정한다. 이 Environment 에 시크릿을 두면
+다른 브랜치의 워크플로가 접근하지 못하고, 필요하면 승인(required reviewers)도 걸 수 있다.
+</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>이름</th><th>종류</th><th>값</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>PROD_ENV_FILE</code></td><td>Secret</td><td>운영 <code>.env</code> 파일 전체 내용</td></tr>
+    <tr><td><code>PROD_SSH_HOST</code></td><td>Secret</td><td>운영 서버 호스트</td></tr>
+    <tr><td><code>PROD_SSH_PORT</code></td><td>Secret</td><td>SSH 포트</td></tr>
+    <tr><td><code>PROD_SSH_USER</code></td><td>Secret</td><td>배포 계정</td></tr>
+    <tr><td><code>PROD_SSH_PRIVATE_KEY</code></td><td>Secret</td><td>배포 계정 개인키</td></tr>
+    <tr><td><code>PROD_SSH_FINGERPRINT</code></td><td>Secret</td><td>서버 호스트키 지문 — 중간자 공격 방지용, 생략하지 말 것</td></tr>
+    <tr><td><code>PROD_DEPLOY_PATH</code></td><td>Variable</td><td>서버의 배포 디렉터리 (예: <code>/srv/app</code>)</td></tr>
+    <tr><td><code>GHCR_IMAGE</code></td><td>Variable</td><td><span class="tag tag-docker">Docker</span> <code>ghcr.io/owner/repo</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+GHCR push 에는 별도 토큰이 필요 없다. 기본 <code>GITHUB_TOKEN</code> 에
+<code>packages: write</code> 권한만 주면 된다.
+</p>
+
+<h3 id="switch">2.5 무중단 전환 원리</h3>
+
+<p>
+nginx 설정 <strong>한 줄만 담긴 파일</strong>을 include 해두고, 배포 스크립트가 그 파일을 덮어쓴 뒤
+<code>nginx -s reload</code> 를 호출한다. reload 는 기존 워커가 처리 중인 요청을 끝낸 뒤 교체되므로
+연결이 끊기지 않는다.
+</p>
+
+<pre><code>nginx/active/upstream.conf   ←  이 파일이 "지금 어느 색이 활성인가"의 유일한 정답
+  set $upstream backend_blue:3000;
+
+nginx/conf.d/default.conf
+  location / {
+      include /etc/nginx/active/upstream.conf;
+      proxy_pass http://$upstream;
+  }</code></pre>
+
+<div class="danger">
+<p>
+<strong>이 파일은 배포 산출물이 아니라 서버의 상태다.</strong> CI 의 SCP 대상에 절대 넣지 말 것.
+넣으면 배포할 때마다 활성 색이 레포에 커밋된 값으로 되돌아가면서, 실제로 떠 있는 색과
+어긋난다(= 트래픽이 죽은 색으로 간다).
+</p>
+</div>
+
+<h3 id="contract">2.6 헬스체크·스모크·롤백 계약</h3>
+
+<p>애플리케이션은 <code>GET /health</code> 를 제공해야 한다. 인증 없이 200 을 반환하고, DB·Redis 연결 상태를 반영한다.</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>단계</th><th>대상</th><th>실패하면</th><th>사용자 영향</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>헬스체크</td>
+      <td>새 색을 직접 (<code>127.0.0.1:포트/health</code> 또는 컨테이너 health)</td>
+      <td>새 색 제거, 배포 취소</td>
+      <td>없음 — 트래픽은 아직 현재 색</td>
+    </tr>
+    <tr>
+      <td>스모크 테스트</td>
+      <td>nginx 를 통과하는 경로 (<code>127.0.0.1/health</code>)</td>
+      <td>upstream 되돌리고 reload, 새 색 제거</td>
+      <td>수 초 (전환 직후 실패한 요청만)</td>
+    </tr>
+    <tr>
+      <td>배포 후 발견</td>
+      <td>모니터링·알림</td>
+      <td>이전 색 <code>start</code> → upstream 되돌림 → reload</td>
+      <td>발견까지의 시간</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+헬스체크는 <strong>replica 전체</strong>가 healthy 여야 통과다. 하나라도 아니면 전환하지 않는다.
+타임아웃은 90초, 폴링 3초를 기본값으로 한다.
+</p>
+
+<h3 id="pr-check">2.7 PR 검사 템플릿 <span class="tag tag-common">공통</span></h3>
+
+<p>Docker · PM2 어느 쪽이든 이 파일은 동일하다.</p>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">.github/workflows/pr-check.yml</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code>name: PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Format, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Prisma Client 생성에는 URL 형식이 필요하지만 DB 연결은 하지 않는다.
+      DATABASE_URL: mysql://ci:ci@localhost:3306/ci
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Check lint
+        run: npm run lint:check
+
+      - name: Run tests
+        run: npm run test:ci
+
+      - name: Build
+        run: npm run build</code></pre>
+</div>
+
+<div class="note">
+<p>
+<code>DATABASE_URL</code> 은 Prisma Client 를 <em>생성</em>할 때 형식 검증에만 쓰인다. 실제 DB 에
+접속하지 않으므로 더미 값이면 된다. 테스트가 실제 DB 를 필요로 하면
+<code>services:</code> 로 컨테이너를 띄워 붙인다.
+</p>
+</div>
+
+<h2 id="docker">3. Docker 배포 <span class="tag tag-docker">Docker</span></h2>
+
+<h3 id="docker-files">3.1 파일 구성</h3>
+
+<pre><code>.github/workflows/
+  pr-check.yml          # 2.7 공통
+  build-image.yml       # 3.2  버전 검사 → 빌드/푸시 → 배포
+Dockerfile              # 3.3  멀티 스테이지
+.dockerignore           # 3.3
+docker-compose.yml      # 3.4  backend_blue / backend_green / redis / nginx
+nginx/
+  conf.d/default.conf   # 3.5  프록시 + JSON 액세스 로그
+  active/upstream.conf  # ★ 서버 상태. 레포에 커밋하지 않고 .gitignore
+scripts/deploy.sh       # 3.6  blue-green 전환</code></pre>
+
+<h3 id="docker-workflow">3.2 배포 워크플로</h3>
+
+<p>
+잡을 <code>check-version</code> → <code>build-and-push</code> → <code>deploy</code> 세 개로 나눈다.
+버전이 중복이면 첫 잡에서 끝나므로 빌드 러너를 쓰지 않는다.
+</p>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">.github/workflows/build-image.yml</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code>name: Build and Push Image (arm64)
+
+# main 에 push(=PR 머지) 될 때마다 arm64 이미지를 빌드해 GHCR 에 푸시
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # 필요 시 수동 실행
+
+# 배포 도중 새 push 로 workflow 가 취소되면 blue-green 전환이 중간에 끊길 수 있다.
+# 같은 브랜치의 실행은 취소하지 않고 순서대로 대기시킨다.
+concurrency:
+  group: build-and-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }} # 예: swyp-web-14th-7team/nodi-be
+
+jobs:
+  # ── 1) 버전 태그 중복 검사 ─────────────────────────────
+  # package.json 의 version 이 이미 GHCR 에 있으면 실패 → build 잡이 안 돎(취소)
+  # 레지스트리 조회만 하므로 저렴한 x86 러너 사용
+  check-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read # 태그 존재 확인용
+    outputs:
+      version: ${{ steps.pkg.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from package.json
+        id: pkg
+        run: echo "version=$(node -p "require('./package.json').version")" &gt;&gt; "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fail if version tag already exists
+        run: |
+          IMAGE=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          TAG="${{ env.REGISTRY }}/$IMAGE:v${{ steps.pkg.outputs.version }}"
+          if docker manifest inspect "$TAG" &gt;/dev/null 2&gt;&amp;1; then
+            echo "::error::$TAG 이미 존재 — package.json version 을 올리세요."
+            exit 1
+          fi
+          echo "$TAG 없음 → 빌드 진행"
+
+  # ── 2) 이미지 빌드 &amp; 푸시 ──────────────────────────────
+  # check-version 성공 시에만 실행 (중복 버전이면 여기 도달 못 함)
+  build-and-push:
+    needs: check-version
+    # arm64 네이티브 러너 → QEMU 에뮬레이션 없이 빠르게 arm64 빌드
+    # (private repo 에서 arm 러너를 못 쓰는 플랜이면 runs-on: ubuntu-latest 로 바꾸고
+    #  아래 'Set up QEMU' 스텝 주석을 해제할 것)
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write # GHCR 푸시 권한
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # QEMU (에뮬레이션으로 arm64 빌드할 때만 필요 — 네이티브 arm 러너면 불필요)
+      # - name: Set up QEMU
+      #   uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # 별도 시크릿 불필요
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # latest + 커밋 SHA + package.json 버전 태그 부여
+          # (SHA 는 불변 핀용, latest 는 최신, 버전은 사람이 읽는 릴리스 식별)
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+            type=raw,value=v${{ needs.check-version.outputs.version }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          # package.json 버전을 이미지에 주입 → node 직접 실행 시에도 Swagger 버전 표시
+          build-args: |
+            APP_VERSION=${{ needs.check-version.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # GitHub Actions 캐시로 레이어 재사용 → 빌드 속도 향상
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 3) 운영 서버 배포 ──────────────────────────────────
+  # 이미지 push 가 끝난 뒤 SSH 로 운영 서버에 접속해 이미지를 받고 배포 스크립트를 실행한다.
+  deploy:
+    needs: [check-version, build-and-push]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+
+    steps:
+      # build job 과 runner 가 다르므로 SCP 로 보낼 파일을 다시 checkout 한다.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 운영 환경변수는 저장소에 두지 않고 production Environment Secret으로 파일을 만든다.
+      - name: Create deployment environment file
+        env:
+          PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+        run: |
+          if [ -z "$PROD_ENV_FILE" ]; then
+            echo "::error::production Environment Secret PROD_ENV_FILE 이 비어 있습니다."
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$PROD_ENV_FILE" &gt; .env.deploy
+
+      # Compose·실행 스크립트·정적 nginx/monitoring 설정을 현재 커밋 버전으로 덮어쓴다.
+      # nginx/active/upstream.conf 는 현재 활성 색 상태이므로 SCP 대상에 넣지 않는다.
+      - name: Copy deployment files
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          port: ${{ secrets.PROD_SSH_PORT }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
+          source: docker-compose.yml,.env.deploy,scripts/deploy.sh,nginx/conf.d/default.conf,monitoring
+          target: ${{ vars.PROD_DEPLOY_PATH }}
+          overwrite: true
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
+          GHCR_IMAGE: ${{ vars.GHCR_IMAGE }}
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          port: ${{ secrets.PROD_SSH_PORT }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
+          envs: DEPLOY_PATH,GHCR_IMAGE
+          script: |
+            set -euo pipefail
+            chmod 600 "${DEPLOY_PATH}/.env.deploy"
+            mkdir -p "${DEPLOY_PATH}/nginx/active"
+            if [ ! -f "${DEPLOY_PATH}/nginx/active/upstream.conf" ]; then
+              printf '%s\n' 'set $upstream backend_blue:3000;' &gt; "${DEPLOY_PATH}/nginx/active/upstream.conf"
+            fi
+            docker pull "${GHCR_IMAGE}:latest"
+            "${DEPLOY_PATH}/scripts/deploy.sh"
+            docker image prune -f</code></pre>
+</div>
+
+<div class="note">
+<p>
+<strong>arm64 러너</strong>: <code>runs-on: ubuntu-24.04-arm</code> 는 네이티브라 QEMU 에뮬레이션 없이 빠르다.
+플랜 때문에 arm 러너를 못 쓰면 <code>ubuntu-latest</code> 로 바꾸고 <code>Set up QEMU</code> 스텝의 주석을 해제한다(빌드는 몇 배 느려진다).
+x86 서버라면 <code>platforms: linux/amd64</code> 로 바꾼다.
+</p>
+</div>
+
+<h3 id="dockerfile">3.3 Dockerfile</h3>
+
+<p>
+빌드 스테이지에서 devDependencies 로 컴파일하고, 런타임 스테이지는
+<code>npm ci --omit=dev</code> + <code>dist</code> 만 가진다.
+</p>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">Dockerfile</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code># syntax=docker/dockerfile:1
+# check=error=true
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+RUN npx prisma generate
+RUN npm run build
+
+FROM node:22-alpine
+
+WORKDIR /app
+
+# npm 이 아닌 node 로 직접 실행하면 npm_package_version 이 주입되지 않음.
+# 빌드 시 APP_VERSION 을 받아 런타임 env 로 심어 Swagger setVersion 에서 사용.
+ARG APP_VERSION
+ENV npm_package_version=$APP_VERSION
+
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma/generated ./prisma/generated
+
+HEALTHCHECK \
+    --start-period=15s \
+    --start-interval=2s \
+    --interval=10s \
+    --timeout=5s \
+    --retries=3 \
+    CMD wget -qO- http://localhost:3000/health || exit 1
+
+EXPOSE 3000
+CMD ["node", "dist/src/main"]</code></pre>
+</div>
+
+<div class="note">
+<p>
+<code>HEALTHCHECK</code> 는 <strong>배포 스크립트가 의존하는 계약</strong>이다. 이게 없으면 컨테이너 상태가
+영원히 <code>none</code> 이라 헬스체크 대기가 타임아웃까지 돌고 배포가 실패한다.
+<code>--start-interval</code> 로 기동 직후에는 촘촘히 확인해 배포를 빠르게 끝낸다.
+</p>
+</div>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">.dockerignore</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code>node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+npm-debug.log*
+Dockerfile
+docker-compose.yml
+.dockerignore
+nginx
+test
+*.md</code></pre>
+</div>
+
+<h3 id="docker-compose">3.4 docker-compose.yml</h3>
+
+<p>
+같은 이미지를 <code>backend_blue</code> / <code>backend_green</code> 두 서비스로 선언한다.
+green 에만 <code>profiles: ["green"]</code> 을 붙여 평소에는 올라오지 않게 한다.
+</p>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">docker-compose.yml</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code>services:
+  # blue / green 두 서비스는 이미지·설정이 완전히 동일하고 이름만 다르다.
+  # nginx 가 active/upstream.conf 로 어느 쪽에 트래픽을 보낼지 고른다.
+  backend_blue:
+    image: ghcr.io/OWNER/REPO:latest
+    env_file:
+      - .env.deploy
+    deploy:
+      replicas: 2
+    expose: ["3000"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  backend_green:
+    image: ghcr.io/OWNER/REPO:latest
+    env_file:
+      - .env.deploy
+    deploy:
+      replicas: 2
+    expose: ["3000"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # green 은 평소 내려가 있으므로 기본 up 대상에서 제외한다.
+    # 이 profile 때문에 green 을 다룰 때는 항상 --profile green 이 필요하다.
+    profiles: ["green"]
+    stop_grace_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: be-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    expose: ["6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: be-nginx
+    ports: ["8080:80"]
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # 활성 색 상태 파일. 배포 스크립트가 이 파일만 바꾸고 reload 한다.
+      - ./nginx/active:/etc/nginx/active:ro
+    restart: unless-stopped
+
+volumes:
+  redis-data:</code></pre>
+</div>
+
+<div class="danger">
+<p>
+<strong><code>--profile green</code> 을 빼먹으면 green 관련 명령이 조용히 무시된다.</strong>
+blue 는 profile 이 없으므로 필요 없고, green 을 다루는 모든 명령에는 붙여야 한다.
+배포 스크립트는 색에 따라 이 인자를 자동으로 붙인다.
+</p>
+</div>
+
+<h3 id="docker-nginx">3.5 nginx 설정</h3>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">nginx/conf.d/default.conf</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code># 앞단(호스트 nginx 등)이 보낸 X-Forwarded-Proto 가 있으면 그대로 신뢰하고,
+# 없으면(도커 nginx 직접 접근) 현재 scheme 으로 fallback
+map $http_x_forwarded_proto $forwarded_proto {
+    default $http_x_forwarded_proto;
+    ''      $scheme;
+}
+
+# 기본 combined 포맷은 평문이라 로그 수집기에서 필드로 못 거르고, 무엇보다 $request_id 가
+# 남지 않아 백엔드 로그와 같은 요청으로 묶이지 않는다(502 처럼 백엔드에 줄이 없는 경우가 특히 문제).
+# $upstream_addr 은 resolver 가 푼 IP 라 사람이 못 읽으므로, set 한 $upstream 도 target 으로 남겨 색을 식별한다.
+log_format json_log escape=json '{'
+    '"req_id":"$request_id",'
+    '"method":"$request_method",'
+    '"url":"$request_uri",'
+    '"status":"$status",'
+    '"target":"$upstream",'
+    '"upstream_addr":"$upstream_addr",'
+    '"upstream_status":"$upstream_status",'
+    '"request_time":"$request_time",'
+    '"upstream_time":"$upstream_response_time",'
+    '"body_bytes":"$body_bytes_sent",'
+    '"ip":"$remote_addr",'
+    '"ua":"$http_user_agent"'
+'}';
+
+server {
+    listen 80;
+    server_name _;
+
+    access_log /var/log/nginx/access.log json_log;
+
+    # Docker 내부 DNS. proxy_pass 에 변수를 쓰면 nginx 가 기동 시점에 이름을 고정하지 않고
+    # 매 요청 해석하므로, 컨테이너가 재생성돼 IP 가 바뀌어도 따라간다.
+    resolver 127.0.0.11 valid=10s;
+    client_max_body_size 6m;
+
+    location / {
+        # 활성 색(blue/green)을 가리키는 파일에서 $upstream 을 가져온다.
+        # 배포 스크립트가 이 파일만 교체하고 reload → 무중단 전환
+        include /etc/nginx/active/upstream.conf;
+        proxy_pass http://$upstream;
+        proxy_http_version 1.1;
+
+        # 연결 실패/타임아웃 시 다음 replica 로 재시도
+        proxy_next_upstream error timeout http_502 http_503 http_504;
+        proxy_next_upstream_tries 2;
+        proxy_next_upstream_timeout 10s;
+        proxy_connect_timeout 5;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+        # nginx 가 만든 요청 ID 를 백엔드로 전달 → 두 로그가 같은 req_id 로 묶인다
+        proxy_set_header X-Request-Id      $request_id;
+    }
+}</code></pre>
+</div>
+
+<p>
+액세스 로그를 JSON 으로 남기고 <code>$request_id</code> 를 백엔드로 전달하는 것이 표준이다.
+백엔드 로거가 <code>X-Request-Id</code> 를 우선 사용하도록 만들면 nginx 로그와 앱 로그를
+같은 ID 로 묶어 볼 수 있다. 502 처럼 <strong>백엔드에 로그가 아예 없는 장애</strong>에서 특히 중요하다.
+</p>
+
+<h3 id="docker-deploy">3.6 배포 스크립트</h3>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">scripts/deploy.sh</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code>#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────
+# Blue-Green 무중단 배포 스크립트
+#
+# 흐름:
+#   1) 현재 활성 색 파악 (nginx/active/upstream.conf 에서 읽음)
+#   2) 반대 색을 새 이미지로 기동
+#   3) 새 색 헬스체크 (★ 전환 전에! 모든 replica 가 healthy 될 때까지)
+#        실패 → 새 색 종료, 배포 취소 (현재 색 무사 = 사용자 영향 0)
+#   4) upstream.conf 를 새 색으로 교체
+#   5) nginx reload (graceful = 무중단 전환)
+#   6) 스모크 테스트 (nginx 통해 실제 200 응답 확인)
+#        실패 → upstream 롤백 + reload, 새 색 종료 (현재 색 복귀)
+#   7) 이전 색 종료
+#
+# 최초 부팅(둘 다 없을 때)은 먼저 아래로 띄운 뒤 이 스크립트를 사용:
+#   docker compose up -d              # blue + nginx + 로그 수집 스택(loki/alloy/grafana)
+#
+# 사용법:
+#   docker compose pull               # ★ 먼저! GHCR 에서 새 이미지를 받아둘 것
+#   ./scripts/deploy.sh
+#
+# ★ 이 스크립트는 pull 하지 않는다. 받아둔 로컬 이미지로만 배포하므로,
+#   pull 을 빼먹으면 옛 이미지가 그대로 다시 뜨고 헬스체크·스모크 테스트는 통과한다
+#   (= 배포된 줄 알지만 코드는 그대로). compose 는 캐시된 태그를 다시 받지 않음.
+# ─────────────────────────────────────────────────────────────
+set -euo pipefail
+
+# 프로젝트 루트로 이동 (스크립트가 어디서 실행되든 동일하게 동작)
+cd "$(dirname "$0")/.."
+
+ACTIVE_FILE="./nginx/active/upstream.conf"
+NGINX_SVC="nginx"
+HEALTH_TIMEOUT=90      # 새 색 헬스체크 최대 대기(초)
+POLL_INTERVAL=3        # 헬스체크 폴링 간격(초)
+
+log()  { printf '\033[1;34m[deploy]\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m[deploy:warn]\033[0m %s\n' "$*"; }
+err()  { printf '\033[1;31m[deploy:error]\033[0m %s\n' "$*" &gt;&amp;2; }
+
+# 색 → compose profile 인자 (blue 는 profile 없음, green 만 "green")
+profile_args() { [ "$1" = "green" ] &amp;&amp; printf -- '--profile green' || printf ''; }
+
+# 지정한 backend 서비스의 모든 replica가 healthy가 될 때까지 기다린다.
+wait_for_health() {
+  local service="$1"
+  local profile="$2"
+  local elapsed=0
+
+  log "$service 헬스체크 대기 (최대 ${HEALTH_TIMEOUT}s, replica 전체 healthy 필요)..."
+  while :; do
+    # shellcheck disable=SC2086
+    ids=$(docker compose $profile ps -q "$service")
+    total=0; healthy=0
+    for id in $ids; do
+      total=$((total + 1))
+      status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id" 2&gt;/dev/null || echo none)
+      [ "$status" = "healthy" ] &amp;&amp; healthy=$((healthy + 1))
+    done
+    log "  healthy ${healthy}/${total:-0}"
+
+    if [ "$total" -gt 0 ] &amp;&amp; [ "$healthy" -eq "$total" ]; then
+      log "✅ $service 전체 healthy"
+      return 0
+    fi
+
+    if [ "$elapsed" -ge "$HEALTH_TIMEOUT" ]; then
+      err "$service 헬스체크 실패"
+      return 1
+    fi
+    sleep "$POLL_INTERVAL"
+    elapsed=$((elapsed + POLL_INTERVAL))
+  done
+}
+
+# ── 0) 최초 기동 ───────────────────────────────────────────────
+# nginx가 실행 중이 아니면 아직 compose stack이 준비되지 않은 것으로 보고 전체를 blue로 기동한다.
+if [ -z "$(docker compose ps -q "$NGINX_SVC")" ]; then
+  log "실행 중인 nginx가 없음 → 최초 compose 기동"
+  mkdir -p "$(dirname "$ACTIVE_FILE")"
+  printf 'set $upstream backend_blue:3000;\n' &gt; "$ACTIVE_FILE"
+
+  docker compose up -d
+
+  if ! wait_for_health "backend_blue" ""; then
+    err "최초 기동 실패"
+    exit 1
+  fi
+
+  log "최초 기동 스모크 테스트 (http://localhost:8080/health)..."
+  if ! curl -fsS -m 5 http://localhost:8080/health &gt; /dev/null; then
+    err "최초 기동 스모크 테스트 실패"
+    exit 1
+  fi
+
+  log "🎉 최초 compose 기동 성공: blue 활성"
+  exit 0
+fi
+
+# ── 1) 현재 활성 색 파악 ──────────────────────────────────────
+if [ ! -f "$ACTIVE_FILE" ]; then
+  err "$ACTIVE_FILE 가 없습니다. 먼저 'set \$upstream backend_blue:3000;' 로 생성하세요."
+  exit 1
+fi
+
+if grep -q backend_green "$ACTIVE_FILE"; then
+  CURRENT=green; NEXT=blue
+else
+  CURRENT=blue;  NEXT=green
+fi
+
+CUR_SVC="backend_$CURRENT"
+NEXT_SVC="backend_$NEXT"
+CUR_PROFILE=$(profile_args "$CURRENT")
+NEXT_PROFILE=$(profile_args "$NEXT")
+
+log "현재 활성: $CURRENT  →  새로 배포: $NEXT"
+
+# ── 2) 새 색 기동 ─────────────────────────────────────────────
+log "$NEXT_SVC 기동..."
+# shellcheck disable=SC2086
+docker compose $NEXT_PROFILE up -d "$NEXT_SVC"
+
+# ── 3) 새 색 헬스체크 (전환 전!) ──────────────────────────────
+if ! wait_for_health "$NEXT_SVC" "$NEXT_PROFILE"; then
+  err "$NEXT_SVC 헬스체크 실패 → 배포 취소 (현재 색 $CURRENT 무사)"
+  # shellcheck disable=SC2086
+  docker compose $NEXT_PROFILE rm -sf "$NEXT_SVC" || true
+  exit 1
+fi
+
+# ── 4) upstream 전환 ──────────────────────────────────────────
+log "upstream → $NEXT_SVC 로 전환"
+printf 'set $upstream %s:3000;\n' "$NEXT_SVC" &gt; "$ACTIVE_FILE"
+
+# ── 5) nginx reload (무중단) ──────────────────────────────────
+log "nginx reload (graceful)"
+docker compose exec -T "$NGINX_SVC" nginx -s reload
+sleep 2   # 워커 교체 + DNS 재해석 잠깐 대기
+
+# ── 6) 스모크 테스트 (nginx 통해 실제 응답 확인) ──────────────
+log "스모크 테스트 (http://localhost/health)..."
+if ! curl -fsS -m 5 http://localhost:8080/health &gt; /dev/null; then
+  err "스모크 테스트 실패 → 롤백 ($CURRENT 로 복귀)"
+  printf 'set $upstream %s:3000;\n' "$CUR_SVC" &gt; "$ACTIVE_FILE"
+  docker compose exec -T "$NGINX_SVC" nginx -s reload
+  # shellcheck disable=SC2086
+  docker compose $NEXT_PROFILE rm -sf "$NEXT_SVC" || true
+  err "롤백 완료. $CURRENT 가 다시 활성."
+  exit 1
+fi
+log "✅ 스모크 테스트 통과"
+
+# ── 7) 이전 색 종료 ───────────────────────────────────────────
+log "이전 색 $CUR_SVC 종료"
+# shellcheck disable=SC2086
+docker compose $CUR_PROFILE rm -sf "$CUR_SVC" || true
+
+log "🎉 무중단 배포 성공: $CURRENT → $NEXT"</code></pre>
+</div>
+
+<h3 id="docker-bootstrap">3.7 서버 최초 세팅</h3>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">서버에서 1회 실행</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code># 1) 배포 디렉터리 (PROD_DEPLOY_PATH 변수와 같은 경로로)
+sudo mkdir -p /srv/app
+sudo chown "$USER":"$USER" /srv/app
+cd /srv/app
+
+# 2) 활성 색 상태 파일 — 최초는 blue
+#    (CI 의 배포 스텝도 없으면 만들어 주지만, 손으로 먼저 만들어 두는 편이 명확하다)
+mkdir -p nginx/active
+printf 'set $upstream backend_blue:3000;\n' &gt; nginx/active/upstream.conf
+
+# 3) private 이미지라면 GHCR 로그인 (PAT 는 read:packages 만)
+echo "$GHCR_PAT" | docker login ghcr.io -u GITHUB_ID --password-stdin
+
+# 4) 나머지 파일(docker-compose.yml, nginx/conf.d, scripts/deploy.sh, .env.deploy)은
+#    CI 가 SCP 로 올린다. 첫 배포는 워크플로를 한 번 돌리면 되고,
+#    deploy.sh 가 "실행 중인 nginx 없음" 을 감지해 docker compose up -d 로 전체를 기동한다.</code></pre>
+</div>
+
+<h3 id="docker-manual">3.8 수동 배포·롤백</h3>
+
+<p>CI 가 막혔을 때 손으로 같은 순서를 밟는 방법. <strong>배포는 pull + up, 롤백은 start</strong> 라는 구분이 핵심이다.</p>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">수동 배포 / 롤백 (blue → green 예시)</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code>cd /srv/app
+
+# 현재 활성 색 확인
+cat nginx/active/upstream.conf        # set $upstream backend_green:3000; → green 활성
+
+# ── 배포: green 활성 → blue 로 올리기 ────────────────────────
+docker compose pull backend_blue      # ★ 이걸 빼면 캐시된 옛 이미지가 그대로 뜬다
+docker compose up -d backend_blue
+docker compose ps                     # backend_blue 가 전부 (healthy) 될 때까지 대기
+
+# 헬스체크가 안 되면 여기서 취소한다 (green 은 계속 서비스 중이므로 영향 없음)
+#   docker compose rm -sf backend_blue
+
+echo 'set $upstream backend_blue:3000;' &gt; nginx/active/upstream.conf
+docker compose exec nginx nginx -s reload
+curl -fsS http://localhost:8080/health          # 스모크 테스트
+docker compose --profile green stop backend_green
+
+# ── 롤백: blue 활성 → green 으로 복귀 ────────────────────────
+# ★ pull/up 이 아니라 start. 옛 이미지로 만들어진 컨테이너를 그대로 되살린다.
+docker compose --profile green start backend_green
+docker compose --profile green ps               # (healthy) 대기
+echo 'set $upstream backend_green:3000;' &gt; nginx/active/upstream.conf
+docker compose exec nginx nginx -s reload
+curl -fsS http://localhost:8080/health
+docker compose stop backend_blue</code></pre>
+</div>
+
+<div class="danger">
+<p>
+<code>docker compose pull</code> 을 빼먹으면 캐시된 <strong>옛 이미지</strong>가 그대로 다시 뜬다.
+헬스체크와 스모크 테스트는 통과하므로 "배포 성공" 으로 보이지만 코드는 바뀌지 않는다.
+</p>
+</div>
+
+<h2 id="pm2">4. PM2 배포 <span class="tag tag-pm2">PM2</span></h2>
+
+<p>
+docker 판과 <strong>단계가 1:1로 대응</strong>한다. 다른 점은 세 가지다:
+색이 컨테이너가 아니라 <em>포트</em>로 갈리고, 코드 격리를 릴리스 디렉터리로 하고,
+nginx 가 호스트에 있어 조작에 <code>sudo</code> 가 필요하다.
+</p>
+
+<h3 id="pm2-files">4.1 파일 구성</h3>
+
+<pre><code># 레포
+.github/workflows/
+  pr-check.yml          # 2.7 공통
+  deploy-pm2.yml        # 4.2
+ecosystem.config.js     # 4.3  app-blue(3001) / app-green(3002)
+scripts/deploy-pm2.sh   # 4.5
+
+# 서버 ($PROD_DEPLOY_PATH, 예: /srv/app)
+incoming/               # CI 가 업로드하는 위치 (release.tar.gz, .env.deploy)
+releases/&lt;version&gt;-&lt;sha&gt;/  # 릴리스별 코드. 색마다 서로 다른 릴리스를 물 수 있다
+shared/.env             # 운영 환경변수 (릴리스마다 심볼릭 링크)
+/etc/nginx/app-active/upstream.conf   # ★ 서버 상태</code></pre>
+
+<h3 id="pm2-workflow">4.2 배포 워크플로</h3>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">.github/workflows/deploy-pm2.yml</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code>name: Build and Deploy (pm2)
+
+# main 에 push(=PR 머지) 될 때마다 번들을 만들어 운영 서버에 blue-green 배포
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # 필요 시 수동 실행
+
+# 배포 도중 새 push 로 workflow 가 취소되면 blue-green 전환이 중간에 끊길 수 있다.
+# 같은 브랜치의 실행은 취소하지 않고 순서대로 대기시킨다.
+concurrency:
+  group: build-and-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── 1) 버전 태그 중복 검사 ─────────────────────────────
+  # 이미지 레지스트리가 없으므로 git tag 로 같은 판정을 한다.
+  # package.json 의 version 태그가 이미 있으면 실패 → 아래 잡이 안 돎
+  check-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.pkg.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 태그 조회용
+
+      - name: Read version from package.json
+        id: pkg
+        run: echo "version=$(node -p "require('./package.json').version")" &gt;&gt; "$GITHUB_OUTPUT"
+
+      - name: Fail if version tag already exists
+        run: |
+          TAG="v${{ steps.pkg.outputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" &gt;/dev/null 2&gt;&amp;1; then
+            echo "::error::$TAG 태그가 이미 존재 — package.json version 을 올리세요."
+            exit 1
+          fi
+          echo "$TAG 없음 → 빌드 진행"
+
+  # ── 2) 번들 빌드 ───────────────────────────────────────
+  build:
+    needs: check-version
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Prisma Client 생성에는 URL 형식이 필요하지만 DB 연결은 하지 않는다.
+      DATABASE_URL: mysql://ci:ci@localhost:3306/ci
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build
+        run: npm run build
+
+      # ★ node_modules 와 prisma/generated 는 넣지 않는다.
+      #   네이티브 모듈(sharp)·Prisma 쿼리 엔진은 플랫폼(arm64/x64, glibc/musl)에 묶여 있어
+      #   러너에서 만든 것을 운영 서버에 그대로 옮기면 실행 시점에 깨진다. 서버에서 다시 만든다.
+      - name: Pack release artifact
+        run: |
+          tar -czf release.tar.gz \
+            dist package.json package-lock.json prisma ecosystem.config.js public
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release.tar.gz
+          retention-days: 7
+
+  # ── 3) 운영 서버 배포 ──────────────────────────────────
+  deploy:
+    needs: [check-version, build]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: write # 성공 후 버전 태그 push
+
+    steps:
+      # 배포 스크립트를 보내기 위해 다시 checkout 한다.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      # 운영 환경변수는 저장소에 두지 않고 production Environment Secret 으로 파일을 만든다.
+      - name: Create deployment environment file
+        env:
+          PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+        run: |
+          if [ -z "$PROD_ENV_FILE" ]; then
+            echo "::error::production Environment Secret PROD_ENV_FILE 이 비어 있습니다."
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$PROD_ENV_FILE" &gt; .env.deploy
+
+      - name: Upload release to server
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          port: ${{ secrets.PROD_SSH_PORT }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
+          source: release.tar.gz,.env.deploy,scripts/deploy-pm2.sh
+          target: ${{ vars.PROD_DEPLOY_PATH }}/incoming
+          overwrite: true
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
+          RELEASE: v${{ needs.check-version.outputs.version }}-${{ github.sha }}
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          port: ${{ secrets.PROD_SSH_PORT }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
+          envs: DEPLOY_PATH,RELEASE
+          script: |
+            set -euo pipefail
+            chmod 600 "${DEPLOY_PATH}/incoming/.env.deploy"
+            chmod +x "${DEPLOY_PATH}/incoming/scripts/deploy-pm2.sh"
+            "${DEPLOY_PATH}/incoming/scripts/deploy-pm2.sh"
+
+      # 배포가 성공한 커밋에만 태그를 남긴다 → 다음 배포의 중복 검사 기준이 된다.
+      - name: Tag released version
+        run: |
+          TAG="v${{ needs.check-version.outputs.version }}"
+          git tag "$TAG"
+          git push origin "$TAG"</code></pre>
+</div>
+
+<div class="danger">
+<p>
+<strong><code>node_modules</code> 를 아티팩트에 넣지 말 것.</strong> <code>sharp</code> 같은 네이티브 모듈과
+Prisma 쿼리 엔진은 아키텍처(arm64/x64)와 libc(glibc/musl)에 묶인 바이너리를 포함한다.
+러너에서 만든 것을 서버로 옮기면 설치는 성공하고 <strong>실행 시점에</strong> 깨진다.
+</p>
+</div>
+
+<h3 id="pm2-ecosystem">4.3 ecosystem.config.js</h3>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">ecosystem.config.js</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code>// pm2 Blue-Green 설정.
+// 색마다 포트를 고정하고, nginx 가 upstream 파일로 어느 색에 보낼지 고른다.
+// deploy-pm2.sh 가 릴리스 디렉터리로 cd 한 뒤 --only 로 한 색만 기동하므로,
+// 두 색은 서로 다른 릴리스(=다른 코드)를 동시에 물고 있을 수 있다.
+const base = {
+  script: 'dist/src/main.js',
+  // cluster 모드는 node cluster 로 리스닝 소켓을 공유한다 → 같은 PORT 로 2 프로세스 가능.
+  exec_mode: 'cluster',
+  instances: 2,
+  autorestart: true,
+  max_memory_restart: '512M',
+  // pino 는 JSON 을 한 줄로 뱉는다. pm2 가 타임스탬프 접두사를 붙이면 그 줄이 깨져
+  // 로그 수집기가 파싱하지 못한다.
+  time: false,
+  merge_logs: true,
+  // 부팅 직후 죽는 앱이 무한 재시작하며 로그를 뒤덮는 것을 막는다.
+  min_uptime: '15s',
+  max_restarts: 5,
+  // SIGINT 를 받고 Nest 의 enableShutdownHooks 가 정리할 시간을 준다.
+  kill_timeout: 30000,
+};
+
+module.exports = {
+  apps: [
+    {
+      ...base,
+      name: 'app-blue',
+      // ★ NODE_ENV 는 반드시 운영 값으로. 이 프로젝트는 prod 가 아니면 pino-pretty 를
+      //   transport 로 물게 되는데, 서버에는 devDependency 가 없어 기동 자체가 실패한다.
+      env: { NODE_ENV: 'prod', PORT: 3001 },
+      out_file: '/var/log/app/blue-out.log',
+      error_file: '/var/log/app/blue-error.log',
+    },
+    {
+      ...base,
+      name: 'app-green',
+      env: { NODE_ENV: 'prod', PORT: 3002 },
+      out_file: '/var/log/app/green-out.log',
+      error_file: '/var/log/app/green-error.log',
+    },
+  ],
+};</code></pre>
+</div>
+
+<div class="note">
+<p>
+<code>exec_mode: 'cluster'</code> + <code>instances: 2</code> 는 node cluster 로 리스닝 소켓을 공유하므로
+두 프로세스가 같은 포트를 쓴다. docker 판의 <code>replicas: 2</code> 에 대응한다.
+</p>
+</div>
+
+<h3 id="pm2-nginx">4.4 nginx 설정</h3>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">/etc/nginx/conf.d/app.conf</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code># /etc/nginx/conf.d/app.conf
+#
+# docker 판과 다른 점: 백엔드가 호스트 프로세스이므로 컨테이너 DNS(resolver)가 필요 없고,
+# upstream 블록을 쓸 수 있어 keepalive 로 커넥션을 재사용할 수 있다.
+
+map $http_x_forwarded_proto $forwarded_proto {
+    default $http_x_forwarded_proto;
+    ''      $scheme;
+}
+
+log_format json_log escape=json '{'
+    '"req_id":"$request_id",'
+    '"method":"$request_method",'
+    '"url":"$request_uri",'
+    '"status":"$status",'
+    '"target":"$upstream",'
+    '"upstream_addr":"$upstream_addr",'
+    '"upstream_status":"$upstream_status",'
+    '"request_time":"$request_time",'
+    '"upstream_time":"$upstream_response_time",'
+    '"body_bytes":"$body_bytes_sent",'
+    '"ip":"$remote_addr",'
+    '"ua":"$http_user_agent"'
+'}';
+
+# 색별 포트는 ecosystem.config.js 와 반드시 일치해야 한다.
+upstream app_blue  { server 127.0.0.1:3001; keepalive 32; }
+upstream app_green { server 127.0.0.1:3002; keepalive 32; }
+
+server {
+    listen 80;
+    server_name _;
+
+    access_log /var/log/nginx/access.log json_log;
+    client_max_body_size 6m;
+
+    location / {
+        # set $upstream app_blue;  ← 배포 스크립트가 이 한 줄만 바꾼다
+        include /etc/nginx/app-active/upstream.conf;
+        # proxy_pass 에 변수를 쓰면서 그 값이 upstream 블록 이름이면 resolver 없이 그 그룹으로 간다.
+        proxy_pass http://$upstream;
+        proxy_http_version 1.1;
+        # keepalive 를 쓰려면 hop-by-hop Connection 헤더를 비워야 한다.
+        proxy_set_header Connection "";
+
+        proxy_connect_timeout 5;
+        proxy_next_upstream error timeout http_502 http_503 http_504;
+        proxy_next_upstream_tries 2;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+        proxy_set_header X-Request-Id      $request_id;
+    }
+}</code></pre>
+</div>
+
+<h3 id="pm2-deploy">4.5 배포 스크립트</h3>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">scripts/deploy-pm2.sh</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code>#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────
+# pm2 Blue-Green 무중단 배포 스크립트 (운영 서버에서 실행)
+#
+# 흐름: docker 판(scripts/deploy.sh)과 단계가 동일하다.
+#   0) 릴리스 전개 + 의존성 설치
+#   1) 현재 활성 색 파악 (nginx active/upstream.conf 에서 읽음)
+#   2) 반대 색을 새 릴리스로 기동
+#   3) 새 색 헬스체크 (★ 전환 전에!)
+#        실패 → 새 색 삭제, 배포 취소 (현재 색 무사 = 사용자 영향 0)
+#   4) upstream.conf 를 새 색으로 교체
+#   5) nginx reload (graceful = 무중단 전환)
+#   6) 스모크 테스트 (nginx 통해 실제 200 응답 확인)
+#        실패 → upstream 롤백 + reload, 새 색 삭제
+#   7) 이전 색 stop (삭제하지 않음 = 빠른 롤백 위해 보존)
+#
+# 전제:
+#   - CI 가 $APP_ROOT/incoming/ 에 release.tar.gz, .env.deploy 를 올린 뒤 이 스크립트를 호출
+#   - 호스트 nginx 가 $ACTIVE_FILE 을 include (가이드 4.4)
+#   - nginx 조작용 sudoers NOPASSWD 설정 완료 (가이드 4.6)
+# ─────────────────────────────────────────────────────────────
+set -euo pipefail
+
+INCOMING="$(cd "$(dirname "$0")/.." &amp;&amp; pwd)"   # $APP_ROOT/incoming
+APP_ROOT="$(dirname "$INCOMING")"
+RELEASES="$APP_ROOT/releases"
+SHARED="$APP_ROOT/shared"
+ACTIVE_FILE="/etc/nginx/app-active/upstream.conf"
+
+RELEASE="${RELEASE:-manual-$(date +%Y%m%d%H%M%S)}"
+KEEP_RELEASES=5        # 남겨둘 과거 릴리스 개수
+HEALTH_TIMEOUT=90      # 새 색 헬스체크 최대 대기(초)
+POLL_INTERVAL=3        # 헬스체크 폴링 간격(초)
+BLUE_PORT=3001
+GREEN_PORT=3002
+SMOKE_URL="http://127.0.0.1/health"   # nginx 를 통과하는 경로여야 의미가 있다
+
+log()  { printf '\033[1;34m[deploy]\033[0m %s\n' "$*"; }
+err()  { printf '\033[1;31m[deploy:error]\033[0m %s\n' "$*" &gt;&amp;2; }
+
+port_of() { [ "$1" = "green" ] &amp;&amp; echo "$GREEN_PORT" || echo "$BLUE_PORT"; }
+
+set_upstream() {
+  printf 'set $upstream app_%s;\n' "$1" | sudo tee "$ACTIVE_FILE" &gt;/dev/null
+}
+
+# 지정 포트가 200 을 돌려줄 때까지 기다린다.
+wait_for_health() {
+  local port="$1" elapsed=0
+  log "127.0.0.1:${port}/health 헬스체크 대기 (최대 ${HEALTH_TIMEOUT}s)..."
+  while :; do
+    if curl -fsS -m 3 "http://127.0.0.1:${port}/health" &gt;/dev/null 2&gt;&amp;1; then
+      log "✅ 포트 ${port} healthy"
+      return 0
+    fi
+    if [ "$elapsed" -ge "$HEALTH_TIMEOUT" ]; then
+      err "포트 ${port} 헬스체크 실패"
+      return 1
+    fi
+    sleep "$POLL_INTERVAL"
+    elapsed=$((elapsed + POLL_INTERVAL))
+  done
+}
+
+# ── 0) 릴리스 전개 ────────────────────────────────────────────
+RELEASE_DIR="$RELEASES/$RELEASE"
+log "릴리스 전개: $RELEASE_DIR"
+mkdir -p "$RELEASES" "$SHARED"
+rm -rf "$RELEASE_DIR"
+mkdir -p "$RELEASE_DIR"
+tar -xzf "$INCOMING/release.tar.gz" -C "$RELEASE_DIR"
+
+# 앱이 dotenv/config 로 cwd 의 .env 를 읽으므로 릴리스마다 심볼릭 링크한다.
+install -m 600 "$INCOMING/.env.deploy" "$SHARED/.env"
+ln -sfn "$SHARED/.env" "$RELEASE_DIR/.env"
+
+cd "$RELEASE_DIR"
+# prisma CLI 가 devDependency 이므로 전체 설치 → generate → dev 제거 순서로 한다.
+# (--omit=dev 로 먼저 깔면 prisma generate 가 CLI 를 못 찾는다)
+log "의존성 설치 + Prisma Client 생성"
+npm ci
+npx prisma generate
+npm prune --omit=dev
+
+# ── 1) 현재 활성 색 파악 ──────────────────────────────────────
+if [ ! -f "$ACTIVE_FILE" ]; then
+  err "$ACTIVE_FILE 가 없습니다. 서버 최초 세팅을 먼저 수행하세요."
+  exit 1
+fi
+
+if grep -q app_green "$ACTIVE_FILE"; then
+  CURRENT=green; NEXT=blue
+else
+  CURRENT=blue;  NEXT=green
+fi
+CUR_PORT=$(port_of "$CURRENT")
+NEXT_PORT=$(port_of "$NEXT")
+
+log "현재 활성: $CURRENT($CUR_PORT)  →  새로 배포: $NEXT($NEXT_PORT)"
+
+# ── 2) 새 색 기동 ─────────────────────────────────────────────
+# 같은 이름의 옛 프로세스는 옛 릴리스 디렉터리를 cwd 로 물고 있으므로 지우고 새로 올린다.
+# (pm2 restart 는 cwd 를 바꾸지 않아 새 코드가 반영되지 않는다)
+log "app-$NEXT 기동 (cwd=$RELEASE_DIR)"
+pm2 delete "app-$NEXT" &gt;/dev/null 2&gt;&amp;1 || true
+pm2 start ecosystem.config.js --only "app-$NEXT"
+
+# ── 3) 새 색 헬스체크 (전환 전!) ──────────────────────────────
+if ! wait_for_health "$NEXT_PORT"; then
+  err "app-$NEXT 헬스체크 실패 → 배포 취소 (현재 색 $CURRENT 무사)"
+  pm2 logs "app-$NEXT" --lines 50 --nostream || true
+  pm2 delete "app-$NEXT" &gt;/dev/null 2&gt;&amp;1 || true
+  exit 1
+fi
+
+# ── 4) upstream 전환 ──────────────────────────────────────────
+log "upstream → app_$NEXT 로 전환"
+set_upstream "$NEXT"
+
+# ── 5) nginx reload (무중단) ──────────────────────────────────
+log "nginx reload (graceful)"
+sudo nginx -t
+sudo nginx -s reload
+sleep 1
+
+# ── 6) 스모크 테스트 ──────────────────────────────────────────
+log "스모크 테스트 ($SMOKE_URL)..."
+if ! curl -fsS -m 5 "$SMOKE_URL" &gt;/dev/null; then
+  err "스모크 테스트 실패 → 롤백 ($CURRENT 로 복귀)"
+  set_upstream "$CURRENT"
+  sudo nginx -s reload
+  pm2 delete "app-$NEXT" &gt;/dev/null 2&gt;&amp;1 || true
+  err "롤백 완료. $CURRENT 가 다시 활성."
+  exit 1
+fi
+log "✅ 스모크 테스트 통과"
+
+# ── 7) 이전 색 정지 ───────────────────────────────────────────
+# delete 가 아니라 stop → 롤백 때 start 만으로 옛 코드가 그대로 돌아온다.
+log "이전 색 app-$CURRENT 정지"
+pm2 stop "app-$CURRENT" &gt;/dev/null 2&gt;&amp;1 || true
+# 재부팅 후 pm2-startup 이 되살릴 목록을 갱신한다.
+pm2 save
+
+# ── 8) 오래된 릴리스 정리 ─────────────────────────────────────
+# 정지된 이전 색이 아직 옛 릴리스를 cwd 로 쓰므로 KEEP_RELEASES 는 2 이상이어야 한다.
+cd "$RELEASES"
+ls -1dt */ 2&gt;/dev/null | tail -n "+$((KEEP_RELEASES + 1))" | xargs -r rm -rf
+
+log "🎉 무중단 배포 성공: $CURRENT → $NEXT ($RELEASE)"</code></pre>
+</div>
+
+<h3 id="pm2-bootstrap">4.6 서버 최초 세팅</h3>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">서버에서 1회 실행 (root)</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code># 1) 런타임 설치 (Ubuntu 기준)
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs nginx
+sudo npm i -g pm2
+
+# 2) 디렉터리 (PROD_DEPLOY_PATH 변수와 같은 경로로)
+sudo mkdir -p /srv/app/incoming /srv/app/releases /srv/app/shared /var/log/app
+sudo chown -R deploy:deploy /srv/app /var/log/app
+
+# 3) 활성 색 상태 파일 — 최초는 blue
+sudo mkdir -p /etc/nginx/app-active
+printf 'set $upstream app_blue;\n' | sudo tee /etc/nginx/app-active/upstream.conf
+
+# 4) nginx 설정 배치 (4.4 내용) 후 검증
+sudo cp app.conf /etc/nginx/conf.d/app.conf
+sudo nginx -t &amp;&amp; sudo systemctl reload nginx
+
+# 5) 재부팅 후 pm2 프로세스 자동 복원
+sudo env PATH=$PATH pm2 startup systemd -u deploy --hp /home/deploy
+
+# 6) 첫 배포는 워크플로를 한 번 돌린다.
+#    blue 가 없는 상태에서 시작하면 첫 배포는 green 으로 올라가고 blue 는 다음 배포 때 채워진다.
+#    (upstream 이 blue 를 가리키는데 blue 가 없으므로, 첫 배포의 스모크 테스트는
+#     전환 후에 수행되어 정상 통과한다)</code></pre>
+</div>
+
+<p>배포 계정이 비밀번호 없이 nginx 만 조작할 수 있도록 sudoers 를 좁게 준다.</p>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">/etc/sudoers.d/deploy-nginx (visudo -f 로 편집)</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code># 배포 계정이 비밀번호 없이 "nginx 검증 · reload · 활성 색 파일 교체" 만 할 수 있게 한다.
+# 경로는 `command -v nginx`, `command -v tee` 로 확인해 정확히 적을 것.
+# NOPASSWD 대상을 넓게 주면(예: ALL) 배포 키가 곧 root 가 된다.
+deploy ALL=(root) NOPASSWD: /usr/sbin/nginx -t
+deploy ALL=(root) NOPASSWD: /usr/sbin/nginx -s reload
+deploy ALL=(root) NOPASSWD: /usr/bin/tee /etc/nginx/app-active/upstream.conf</code></pre>
+</div>
+
+<h3 id="pm2-manual">4.7 수동 롤백</h3>
+
+<div class="code-block">
+  <div class="code-head">
+    <span class="code-file">수동 롤백 (green 활성 → blue 복귀)</span>
+    <button class="copy-btn" type="button">복사</button>
+  </div>
+<pre><code># 현재 상태 확인
+cat /etc/nginx/app-active/upstream.conf   # set $upstream app_green; → green 활성
+pm2 list                                  # app-blue 가 stopped 로 남아 있어야 한다
+
+# ── 롤백: green 활성 → blue 복귀 ─────────────────────────────
+# ★ start 만 한다. 정지된 프로세스가 옛 릴리스 디렉터리를 cwd 로 그대로 물고 있다.
+pm2 start app-blue
+curl -fsS http://127.0.0.1:3001/health    # blue 직접 헬스체크
+printf 'set $upstream app_blue;\n' | sudo tee /etc/nginx/app-active/upstream.conf
+sudo nginx -t &amp;&amp; sudo nginx -s reload
+curl -fsS http://127.0.0.1/health         # nginx 통과 스모크 테스트
+pm2 stop app-green
+pm2 save
+
+# ── 두 단계 이상 과거로 되돌릴 때 ───────────────────────────
+ls -1t /srv/app/releases                  # 최근 KEEP_RELEASES 개만 남아 있다
+cd /srv/app/releases/RELEASE_TO_RESTORE
+pm2 delete app-blue
+pm2 start ecosystem.config.js --only app-blue
+# 이후 위 롤백 절차의 헬스체크 → upstream 교체 → reload 를 그대로 진행</code></pre>
+</div>
+
+<h3 id="pm2-reload">4.8 pm2 reload 로 충분한 경우</h3>
+
+<p>
+pm2 는 <code>pm2 reload</code> 로 cluster 워커를 하나씩 교체하는 자체 무중단 기능이 있다.
+blue-green 없이 이것만 쓰는 것은 <strong>다음 조건을 모두 만족할 때만</strong> 허용한다.
+</p>
+
+<ul>
+  <li>새 코드가 기동에 실패해도 즉시 알아차릴 수 있다 (reload 는 실패한 워커를 계속 재시작하며 옛 워커를 이미 죽였을 수 있다)</li>
+  <li>롤백을 재배포로 감당할 수 있다 (직전 버전이 서버에 없다)</li>
+  <li>DB 마이그레이션이 없거나 하위 호환이다</li>
+</ul>
+
+<div class="note">
+<p>
+<code>reload</code> 는 <strong>전환 전 헬스체크</strong>와 <strong>즉시 롤백</strong>을 제공하지 못한다.
+그래서 사내 표준은 blue-green 이고, <code>reload</code> 는 내부 도구·배치처럼 장애 허용도가 높은 것에만 쓴다.
+</p>
+</div>
+
+<h2 id="checklist">5. 신규 레포 도입 체크리스트</h2>
+
+<h4>레포</h4>
+<ul class="checklist">
+  <li><code>GET /health</code> 엔드포인트 (인증 없이 200, DB·캐시 연결 반영)</li>
+  <li><code>package.json</code> 에 <code>format:check</code>, <code>lint:check</code>, <code>test:ci</code>, <code>build</code> 스크립트</li>
+  <li><code>.github/workflows/pr-check.yml</code> 복사 (2.7)</li>
+  <li>배포 워크플로 복사 — Docker 는 3.2, PM2 는 4.2</li>
+  <li><code>nginx/active/upstream.conf</code> 를 <code>.gitignore</code> 에 추가 (Docker)</li>
+  <li>배포 스크립트에 실행 권한 (<code>git update-index --chmod=+x scripts/deploy.sh</code>)</li>
+</ul>
+
+<h4>GitHub 설정</h4>
+<ul class="checklist">
+  <li><code>main</code> branch protection — 직접 push 금지, PR 검사를 required check 로</li>
+  <li><code>production</code> Environment 생성 + 2.4 의 Secret / Variable 등록</li>
+  <li>배포 워크플로 권한 확인 — Docker 는 <code>packages: write</code>, PM2 는 태그 push 용 <code>contents: write</code></li>
+</ul>
+
+<h4>서버</h4>
+<ul class="checklist">
+  <li>배포 전용 계정 + CI 공개키 등록</li>
+  <li><code>PROD_SSH_FINGERPRINT</code> 값 확보 (<code>ssh-keyscan -p 포트 호스트</code>)</li>
+  <li>최초 세팅 실행 — Docker 는 3.7, PM2 는 4.6</li>
+  <li>활성 색 파일 생성 확인</li>
+</ul>
+
+<h4>첫 배포 후 확인</h4>
+<ul class="checklist">
+  <li>두 번째 배포가 반대 색으로 가는지 (색 핑퐁이 실제로 도는지)</li>
+  <li>일부러 깨진 커밋을 배포해 헬스체크 실패 시 <strong>현재 색이 유지</strong>되는지</li>
+  <li>롤백 절차를 실제로 한 번 실행해 보기 (문서만 읽고 넘기지 말 것)</li>
+</ul>
+
+<h2 id="pitfalls">6. 자주 나는 실수</h2>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>증상</th><th>원인</th><th>조치</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>배포는 성공인데 코드가 그대로</td>
+      <td><span class="tag tag-docker">Docker</span> <code>pull</code> 없이 <code>up -d</code> — 캐시된 옛 이미지가 뜬다</td>
+      <td>배포 전 <code>docker compose pull</code>. CI 는 <code>docker pull ...:latest</code> 를 이미 한다</td>
+    </tr>
+    <tr>
+      <td>green 관련 명령이 아무 일도 안 함</td>
+      <td><span class="tag tag-docker">Docker</span> <code>--profile green</code> 누락</td>
+      <td>green 을 다루는 모든 compose 명령에 붙인다</td>
+    </tr>
+    <tr>
+      <td>배포 후 트래픽이 죽은 색으로</td>
+      <td><code>active/upstream.conf</code> 를 SCP·git 으로 덮어씀</td>
+      <td>이 파일은 서버 상태. 배포 대상에서 제외 (2.5)</td>
+    </tr>
+    <tr>
+      <td>헬스체크가 타임아웃까지 대기</td>
+      <td><span class="tag tag-docker">Docker</span> 이미지에 <code>HEALTHCHECK</code> 가 없어 상태가 <code>none</code></td>
+      <td>Dockerfile 에 <code>HEALTHCHECK</code> 추가 (3.3)</td>
+    </tr>
+    <tr>
+      <td>배포 중 workflow 가 취소되고 어중간한 상태로 남음</td>
+      <td>배포 워크플로에 <code>cancel-in-progress: true</code></td>
+      <td><code>false</code> 로 (2.2)</td>
+    </tr>
+    <tr>
+      <td>새 색이 기동 직후 죽음</td>
+      <td><span class="tag tag-pm2">PM2</span> <code>NODE_ENV</code> 가 운영 값이 아니어서 devDependency(pino-pretty 등)를 찾는다</td>
+      <td><code>ecosystem.config.js</code> 의 <code>env</code> 확인 (4.3)</td>
+    </tr>
+    <tr>
+      <td>서버에서 <code>prisma generate</code> 실패</td>
+      <td><span class="tag tag-pm2">PM2</span> <code>--omit=dev</code> 로 먼저 설치해 prisma CLI 가 없다</td>
+      <td><code>npm ci</code> → <code>generate</code> → <code>npm prune --omit=dev</code> 순서 (4.5)</td>
+    </tr>
+    <tr>
+      <td>재배포했는데 옛 코드가 돎</td>
+      <td><span class="tag tag-pm2">PM2</span> <code>pm2 restart</code> 사용 — cwd 가 옛 릴리스에 고정돼 있다</td>
+      <td><code>delete</code> 후 새 릴리스 디렉터리에서 <code>start</code> (4.5)</td>
+    </tr>
+    <tr>
+      <td>재부팅하면 앱이 안 뜸</td>
+      <td><span class="tag tag-pm2">PM2</span> <code>pm2 startup</code> 미설정 또는 <code>pm2 save</code> 누락</td>
+      <td>최초 세팅에서 <code>pm2 startup</code>, 배포 끝에 <code>pm2 save</code> (4.5, 4.6)</td>
+    </tr>
+    <tr>
+      <td>로그가 JSON 으로 파싱되지 않음</td>
+      <td><span class="tag tag-pm2">PM2</span> pm2 가 타임스탬프 접두사를 붙여 한 줄 JSON 이 깨짐</td>
+      <td><code>time: false</code> (4.3)</td>
+    </tr>
+    <tr>
+      <td>같은 버전으로 두 번 배포됨</td>
+      <td>버전 게이트 없이 워크플로를 만들었다</td>
+      <td><code>check-version</code> 잡 추가 (2.3)</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+</main>
+</div>
+
+<script>
+  // 스크롤 위치에 따라 목차 항목 하이라이트
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+    var sections = links
+      .map(function (a) {
+        return { link: a, el: document.getElementById(a.getAttribute('href').slice(1)) };
+      })
+      .filter(function (s) { return s.el; });
+
+    var current = null;
+    var ticking = false;
+
+    function update() {
+      ticking = false;
+      var offset = 100;
+      var active = sections[0];
+      for (var i = 0; i < sections.length; i++) {
+        if (sections[i].el.getBoundingClientRect().top <= offset) active = sections[i];
+      }
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 4) {
+        active = sections[sections.length - 1];
+      }
+      if (active === current) return;
+      if (current) current.link.classList.remove('active');
+      active.link.classList.add('active');
+      current = active;
+    }
+
+    window.addEventListener('scroll', function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  })();
+
+  // 코드 블록 클립보드 복사
+  (function () {
+    // navigator.clipboard 는 보안 컨텍스트에서만 동작한다. file:// 로 열거나 구형
+    // 브라우저인 경우를 대비해 execCommand 폴백을 둔다.
+    function write(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+      }
+      return new Promise(function (resolve, reject) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        ok ? resolve() : reject(new Error('copy failed'));
+      });
+    }
+
+    function flash(btn, cls, label) {
+      var original = btn.dataset.label;
+      btn.classList.add(cls);
+      btn.textContent = label;
+      clearTimeout(btn._timer);
+      btn._timer = setTimeout(function () {
+        btn.classList.remove(cls);
+        btn.textContent = original;
+      }, 1600);
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('.copy-btn'), function (btn) {
+      btn.dataset.label = btn.textContent;
+      btn.addEventListener('click', function () {
+        var pre = btn.closest('.code-block').querySelector('pre');
+        write(pre.textContent).then(
+          function () { flash(btn, 'done', '복사됨'); },
+          function () { flash(btn, 'fail', '복사 실패'); }
+        );
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>
