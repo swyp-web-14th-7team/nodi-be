@@ -31,9 +31,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 이후 스텝들이 localhost:3100 으로 바로 Loki 에 쓸 수 있게 터널을 연다.
+      # job 마다 러너가 다르므로 job 마다 한 번씩 필요하다.
+      - name: Open Loki tunnel
+        uses: ./.github/actions/loki-tunnel
+        continue-on-error: true
+        with:
+          ssh-host: ${{ secrets.PROD_SSH_HOST }}
+          ssh-port: ${{ secrets.PROD_SSH_PORT }}
+          ssh-user: ${{ secrets.PROD_SSH_USER }}
+          ssh-key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          ssh-fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
+
       - name: Read version from package.json
         id: pkg
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Report pipeline start
+        continue-on-error: true
+        uses: ./.github/actions/loki-log
+        with:
+          message: 파이프라인 시작 — 버전 검사
+          status: started
+          version: ${{ steps.pkg.outputs.version }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -52,6 +72,16 @@ jobs:
           fi
           echo "$TAG 없음 → 빌드 진행"
 
+      - name: Report version check failure
+        if: failure()
+        continue-on-error: true
+        uses: ./.github/actions/loki-log
+        with:
+          message: 버전 검사 실패 — 파이프라인 중단
+          level: error
+          status: failure
+          version: ${{ steps.pkg.outputs.version }}
+
   # ── 2) 이미지 빌드 & 푸시 ──────────────────────────────
   # check-version 성공 시에만 실행 (중복 버전이면 여기 도달 못 함)
   build-and-push:
@@ -67,6 +97,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Open Loki tunnel
+        uses: ./.github/actions/loki-tunnel
+        continue-on-error: true
+        with:
+          ssh-host: ${{ secrets.PROD_SSH_HOST }}
+          ssh-port: ${{ secrets.PROD_SSH_PORT }}
+          ssh-user: ${{ secrets.PROD_SSH_USER }}
+          ssh-key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          ssh-fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
+
+      - name: Report build start
+        continue-on-error: true
+        uses: ./.github/actions/loki-log
+        with:
+          message: arm64 이미지 빌드 시작
+          status: started
+          version: ${{ needs.check-version.outputs.version }}
 
       # QEMU (에뮬레이션으로 arm64 빌드할 때만 필요 — 네이티브 arm 러너면 불필요)
       # - name: Set up QEMU
@@ -109,6 +157,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Report build result
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/loki-log
+        with:
+          message: >-
+            ${{ job.status == 'success'
+                && '이미지 빌드·푸시 완료 → 배포 시작 대기'
+                || '이미지 빌드 실패' }}
+          level: ${{ job.status == 'success' && 'info' || 'error' }}
+          status: ${{ job.status }}
+          version: ${{ needs.check-version.outputs.version }}
+
   # ── 3) 운영 서버 배포 ──────────────────────────────────
   # 이미지 push 가 끝난 뒤 SSH 로 운영 서버에 접속해 이미지를 받고 배포 스크립트를 실행한다.
   deploy:
@@ -122,6 +183,24 @@ jobs:
       # build job 과 runner 가 다르므로 SCP 로 보낼 파일을 다시 checkout 한다.
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Open Loki tunnel
+        uses: ./.github/actions/loki-tunnel
+        continue-on-error: true
+        with:
+          ssh-host: ${{ secrets.PROD_SSH_HOST }}
+          ssh-port: ${{ secrets.PROD_SSH_PORT }}
+          ssh-user: ${{ secrets.PROD_SSH_USER }}
+          ssh-key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          ssh-fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
+
+      - name: Report deploy start
+        continue-on-error: true
+        uses: ./.github/actions/loki-log
+        with:
+          message: 운영 서버 배포 시작
+          status: started
+          version: ${{ needs.check-version.outputs.version }}
 
       # 운영 환경변수는 저장소에 두지 않고 production Environment Secret으로 파일을 만든다.
       - name: Create deployment environment file
@@ -149,6 +228,14 @@ jobs:
           target: ${{ vars.PROD_DEPLOY_PATH }}
           overwrite: true
 
+      - name: Report files copied
+        continue-on-error: true
+        uses: ./.github/actions/loki-log
+        with:
+          message: 배포 파일 전송 완료 → blue-green 전환 시작
+          status: running
+          version: ${{ needs.check-version.outputs.version }}
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.2
         env:
@@ -163,11 +250,58 @@ jobs:
           envs: DEPLOY_PATH,GHCR_IMAGE
           script: |
             set -euo pipefail
+            # 실패 시 아래 'Collect deploy.sh log' 가 이 파일을 긁어간다.
+            # 이번 실행이 deploy.sh 까지 못 갔을 때 지난 배포 로그를 잘못 보내지 않도록 먼저 비운다.
+            : > /tmp/nodi-deploy-last.log
             chmod 600 "${DEPLOY_PATH}/.env.deploy"
             mkdir -p "${DEPLOY_PATH}/nginx/active"
             if [ ! -f "${DEPLOY_PATH}/nginx/active/upstream.conf" ]; then
               printf '%s\n' 'set $upstream backend_blue:3000;' > "${DEPLOY_PATH}/nginx/active/upstream.conf"
             fi
             docker pull "${GHCR_IMAGE}:latest"
-            "${DEPLOY_PATH}/scripts/deploy.sh"
+            # err() 는 stderr 로 나가므로 2>&1 로 합쳐야 실패 원인이 로그에 남는다.
+            # set -o pipefail 이 걸려 있어 tee 를 거쳐도 deploy.sh 의 종료 코드가 유지된다.
+            "${DEPLOY_PATH}/scripts/deploy.sh" 2>&1 | tee /tmp/nodi-deploy-last.log
             docker image prune -f
+
+      # deploy.sh 출력은 서버에만 남으므로 실패했을 때만 다시 접속해 가져온다.
+      # 실패한 스텝의 outputs 는 세팅이 보장되지 않아, 이렇게 '성공하는 별도 스텝'으로 분리했다.
+      - name: Collect deploy.sh log
+        if: failure()
+        id: deploy-log
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          port: ${{ secrets.PROD_SSH_PORT }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.PROD_SSH_FINGERPRINT }}
+          capture_stdout: true
+          script: tail -n 300 /tmp/nodi-deploy-last.log 2>/dev/null || true
+
+      # deploy.sh 출력을 줄 단위로 Loki 에 넣는다 (loki-log 가 개행으로 쪼갬).
+      - name: Report deploy.sh log
+        if: failure()
+        continue-on-error: true
+        uses: ./.github/actions/loki-log
+        with:
+          message: ${{ steps.deploy-log.outputs.stdout }}
+          level: error
+          status: failure
+          source: deploy.sh
+          version: ${{ needs.check-version.outputs.version }}
+
+      # Grafana 에서 "이 에러가 몇 시 배포 이후부터인지" 보는 기준선이 되는 마커.
+      - name: Report deploy result
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/loki-log
+        with:
+          message: >-
+            ${{ job.status == 'success'
+                && '🎉 배포 완료 — 신규 버전이 트래픽을 받기 시작'
+                || '배포 실패 — deploy.sh 로그 확인 필요' }}
+          level: ${{ job.status == 'success' && 'info' || 'error' }}
+          status: ${{ job.status }}
+          version: ${{ needs.check-version.outputs.version }}

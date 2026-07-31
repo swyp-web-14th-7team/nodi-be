@@ -60,8 +60,13 @@ services:
     volumes:
       - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki-data:/loki
-    # ★ 호스트에 노출하지 말 것: Loki 는 인증이 없어 열면 누구나 로그를 읽고 쓸 수 있음
+    # ★ 0.0.0.0 으로 열지 말 것: Loki 는 인증이 없어 열면 누구나 로그를 읽고 쓸 수 있음.
+    # 127.0.0.1 바인딩은 호스트 로컬 프로세스에서만 닿고 외부에서는 접근 불가.
+    # CI 가 SSH 포트포워딩(-L 3100:127.0.0.1:3100)으로 배포 진행상황을 밀어넣는 데 사용한다.
+    # (.github/actions/loki-tunnel 참고)
     expose: ["3100"]
+    ports:
+      - "127.0.0.1:3100:3100"
     restart: unless-stopped
 
   alloy:

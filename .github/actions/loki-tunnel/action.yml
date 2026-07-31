@@ -1,0 +1,123 @@
+name: Open Loki SSH tunnel
+description: 러너 → 운영 서버 Loki 로 가는 SSH 포트포워딩 터널을 연다 (job 당 1회)
+
+# Loki 는 인증이 없어 인터넷에 열 수 없다(docker-compose.yml 참고). 대신 운영 서버에서
+# 127.0.0.1:3100 으로만 바인딩하고, 러너는 SSH 터널을 통해 그 루프백에 닿는다.
+#   러너 localhost:3100  ──SSH(암호화)──▶  서버 127.0.0.1:3100  ──▶  be-loki
+#
+# job 첫머리에서 한 번만 호출하면, 이후 그 job 의 모든 스텝이 loki-log 액션으로
+# 즉시(~50ms) 로그를 밀어넣을 수 있다. 스텝마다 SSH 를 새로 여는 것보다 훨씬 싸다.
+#
+# 터널은 백그라운드(ssh -f -N)로 떠서 job 이 끝날 때까지 살아 있다. 러너는 job 종료 후
+# 폐기되므로 별도 정리는 하지 않는다(composite 액션은 post 스텝을 가질 수 없기도 하다).
+#
+# job 이 다르면 러너도 다르므로 터널도 job 마다 따로 열어야 한다.
+
+inputs:
+  ssh-host:
+    description: 운영 서버 호스트. 비어 있으면 터널을 열지 않고 조용히 건너뛴다
+    required: false
+    default: ''
+  ssh-port:
+    description: 운영 서버 SSH 포트
+    default: '22'
+  ssh-user:
+    description: 운영 서버 SSH 계정
+    default: ubuntu
+  ssh-key:
+    description: SSH private key
+    required: false
+    default: ''
+  ssh-fingerprint:
+    description: |
+      서버 호스트 키 fingerprint (예: SHA256:xxxxx).
+      비우면 검증 없이 ssh-keyscan 결과를 신뢰한다 — 중간자 공격에 노출되므로 권장하지 않음.
+    required: false
+    default: ''
+  local-port:
+    description: 러너 쪽에서 열 포트. loki-log 액션의 기본값과 맞출 것
+    default: '3100'
+
+outputs:
+  ready:
+    description: 터널이 열리고 Loki 응답까지 확인됐으면 'true'
+    value: ${{ steps.open.outputs.ready }}
+
+runs:
+  using: composite
+  steps:
+    - name: Open SSH tunnel to Loki
+      id: open
+      shell: bash
+      env:
+        SSH_HOST: ${{ inputs.ssh-host }}
+        SSH_PORT: ${{ inputs.ssh-port }}
+        SSH_USER: ${{ inputs.ssh-user }}
+        SSH_KEY: ${{ inputs.ssh-key }}
+        SSH_FINGERPRINT: ${{ inputs.ssh-fingerprint }}
+        LOCAL_PORT: ${{ inputs.local-port }}
+      run: |
+        set -euo pipefail
+
+        echo "ready=false" >> "$GITHUB_OUTPUT"
+
+        # 로그 수집은 부가 기능이다. 시크릿이 없다고 파이프라인을 세우지 않는다.
+        # (fork PR 처럼 시크릿이 안 내려오는 상황 포함)
+        if [ -z "$SSH_HOST" ] || [ -z "$SSH_KEY" ]; then
+          echo "::notice::SSH 시크릿이 없어 Loki 터널을 건너뜁니다 — 로그 마커만 생략됩니다"
+          exit 0
+        fi
+
+        mkdir -p ~/.ssh && chmod 700 ~/.ssh
+        KEY_FILE=~/.ssh/loki_tunnel_key
+        printf '%s\n' "$SSH_KEY" > "$KEY_FILE"
+        chmod 600 "$KEY_FILE"
+
+        # 호스트 키를 받아 fingerprint 로 검증한다.
+        # StrictHostKeyChecking=no 로 넘기면 터널 상대가 바뀌어도 알아채지 못한다.
+        SCAN=$(mktemp)
+        ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" > "$SCAN" 2>/dev/null || true
+        if [ ! -s "$SCAN" ]; then
+          echo "::warning::ssh-keyscan 실패 ($SSH_HOST:$SSH_PORT) — Loki 터널 생략"
+          exit 0
+        fi
+
+        if [ -n "$SSH_FINGERPRINT" ]; then
+          if ! ssh-keygen -lf "$SCAN" | grep -qF "$SSH_FINGERPRINT"; then
+            echo "::error::호스트 키 fingerprint 불일치 — 중간자 공격 가능성. 터널을 열지 않습니다."
+            exit 1
+          fi
+        else
+          echo "::warning::ssh-fingerprint 가 비어 있어 호스트 키를 검증하지 않았습니다"
+        fi
+        cat "$SCAN" >> ~/.ssh/known_hosts
+        rm -f "$SCAN"
+
+        # -f -N: 명령 실행 없이 백그라운드로 포워딩만
+        # ExitOnForwardFailure: 포워딩을 못 열면 조용히 붙어 있지 말고 실패
+        # ServerAliveInterval: 유휴 상태로 오래 가는 빌드에서 터널이 끊기지 않도록
+        if ! ssh -f -N \
+              -o BatchMode=yes \
+              -o ExitOnForwardFailure=yes \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=3 \
+              -o ConnectTimeout=10 \
+              -i "$KEY_FILE" \
+              -p "$SSH_PORT" \
+              -L "${LOCAL_PORT}:127.0.0.1:3100" \
+              "${SSH_USER}@${SSH_HOST}"; then
+          echo "::warning::SSH 터널 열기 실패 — Loki 마커 없이 진행합니다"
+          exit 0
+        fi
+
+        # 터널만 열리고 반대편 Loki 가 죽어 있을 수 있으므로 /ready 로 확인한다.
+        for i in 1 2 3 4 5; do
+          if curl -sS -m 5 "http://localhost:${LOCAL_PORT}/ready" >/dev/null 2>&1; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Loki 터널 준비 완료 (localhost:${LOCAL_PORT})"
+            exit 0
+          fi
+          sleep 1
+        done
+
+        echo "::warning::터널은 열렸으나 Loki 가 응답하지 않습니다 — 마커 없이 진행합니다"
