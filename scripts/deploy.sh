@@ -129,6 +129,17 @@ if ! wait_for_health "$NEXT_SVC" "$NEXT_PROFILE"; then
   exit 1
 fi
 
+# ★★★★★ 테스트용 강제 실패 — 확인 끝나면 이 블록 통째로 삭제할 것 ★★★★★
+# CI 실패 경로(deploy.sh 출력이 Loki 로 실려가는지) 확인용.
+# upstream 전환 전이라 트래픽은 현재 색($CURRENT)이 계속 받는다 = 운영 영향 없음.
+# err() 는 출력만 하고 종료 코드가 0 이므로 exit 1 이 반드시 필요하다.
+err "테스트용 강제 실패 — deploy.sh 로그가 Loki 로 실려가는지 확인 중"
+log "새 색 $NEXT_SVC 정리 후 종료합니다 (현재 색 $CURRENT 는 그대로 서비스 중)"
+# shellcheck disable=SC2086
+docker compose $NEXT_PROFILE rm -sf "$NEXT_SVC" || true
+exit 1
+# ★★★★★ 여기까지 삭제 ★★★★★
+
 # ── 4) upstream 전환 ──────────────────────────────────────────
 log "upstream → $NEXT_SVC 로 전환"
 printf 'set $upstream %s:3000;\n' "$NEXT_SVC" > "$ACTIVE_FILE"
