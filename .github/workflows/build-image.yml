@@ -22,6 +22,9 @@ jobs:
   # 레지스트리 조회만 하므로 저렴한 x86 러너 사용
   check-version:
     runs-on: ubuntu-latest
+    # 배포를 하지는 않지만, Loki 터널용 SSH 시크릿이 production Environment 에 있어
+    # 이 선언이 없으면 secrets.PROD_SSH_* 가 빈 값으로 내려와 마커가 생략된다.
+    environment: production
     permissions:
       contents: read
       packages: read # 태그 존재 확인용
@@ -90,6 +93,8 @@ jobs:
     # (private repo 에서 arm 러너를 못 쓰는 플랜이면 runs-on: ubuntu-latest 로 바꾸고
     #  아래 'Set up QEMU' 스텝 주석을 해제할 것)
     runs-on: ubuntu-24.04-arm
+    # check-version 과 같은 이유 — Loki 터널용 SSH 시크릿을 읽기 위해 필요하다.
+    environment: production
     permissions:
       contents: read
       packages: write # GHCR 푸시 권한
