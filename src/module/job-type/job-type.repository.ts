@@ -3,6 +3,7 @@ import { PrismaService } from '@/lib/prisma/prisma.service';
 import { JobType, Prisma } from '@/prisma/client';
 import { FindJobTypeDto } from '@/module/job-type/dto/find-job-type.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
+import { UpdateJobTypeDto } from '@/module/job-type/dto/update-job-type.dto';
 
 @Injectable()
 export class JobTypeRepository {
@@ -33,8 +34,17 @@ export class JobTypeRepository {
     return this.prismaService.jobType.findUnique({ where: { id } });
   }
 
-  async updateJobType(id: number, params: Prisma.JobTypeUpdateInput) {
-    return this.prismaService.jobType.update({ where: { id }, data: params });
+  async updateJobType(
+    id: number,
+    { name, imageUrl }: UpdateJobTypeDto,
+  ): Promise<JobType> {
+    return this.prismaService.jobType.update({
+      where: { id },
+      data: {
+        name,
+        ...(imageUrl !== undefined && { imageUrl }),
+      },
+    });
   }
 
   async deleteJobType(id: number) {
