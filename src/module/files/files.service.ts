@@ -4,63 +4,72 @@ import sharp from 'sharp';
 import { S3Service } from '@/lib/s3/s3.service';
 import { UploadImageResponse } from '@/module/files/type/upload-image-response.type';
 
+/** 파생 이미지 크기(px). 정사각은 `{size}.webp`, 그 외는 `{width}x{height}.webp` 로 저장된다 */
+type ImageSize = { width: number; height: number };
+
+const square = (size: number): ImageSize => ({ width: size, height: size });
+
 @Injectable()
 export class FilesService {
-  // 프로필 이미지 파생 사이즈(정사각, px). 원본은 {uuid} 로 별도 저장
-  private static readonly PROFILE_IMAGE_SIZES = [72, 56, 48];
+  private static readonly PROFILE_IMAGE_SIZES = [72, 56, 48].map(square);
 
-  // 개성 이미지 파생 사이즈(정사각, px)
-  private static readonly PERSONALITY_IMAGE_SIZES = [36];
+  private static readonly PERSONALITY_IMAGE_SIZES = [square(36)];
 
-  // 카드 배경 이미지 크기(px). 정사각이 아니므로 width/height 로 지정
-  private static readonly CARD_BACKGROUND_SIZE = { width: 282, height: 400 };
+  private static readonly JOB_TYPE_IMAGE_SIZES = [square(36)];
+
+  private static readonly CARD_BACKGROUND_SIZES = [{ width: 282, height: 400 }];
 
   constructor(private readonly s3Service: S3Service) {}
 
   async uploadProfileImage(
     file: Express.Multer.File,
   ): Promise<UploadImageResponse> {
-    // profile/{YYYY}/{mm}/{uuid} 를 base prefix 로 사용
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const basePrefix = `profile/${yyyy}/${mm}/${randomUUID()}`;
-
-    // 원본은 리사이즈 없이 webp 로 변환해 origin.webp 로 저장
-    const origin = await sharp(file.buffer).webp().toBuffer();
-    const uploads: Promise<string>[] = [
-      this.s3Service.uploadFile(
-        origin,
-        `${basePrefix}/origin.webp`,
-        'image/webp',
-      ),
-    ];
-
-    // 파생 사이즈: {size}.webp 로 리사이즈+크롭 후 업로드
-    for (const size of FilesService.PROFILE_IMAGE_SIZES) {
-      const resized = await this.resizeImage(file.buffer, size, size);
-      uploads.push(
-        this.s3Service.uploadFile(
-          resized,
-          `${basePrefix}/${size}.webp`,
-          'image/webp',
-        ),
-      );
-    }
-    await Promise.all(uploads);
-
-    // uuid 까지의 base URL 반환 → 소비 시 `${url}/72.webp` 처럼 접근
-    return { url: this.s3Service.getPublicUrl(basePrefix) };
+    return this.uploadImage(file, 'profile', FilesService.PROFILE_IMAGE_SIZES);
   }
 
   async uploadPersonalityImage(
     file: Express.Multer.File,
   ): Promise<UploadImageResponse> {
-    // personality/{YYYY}/{mm}/{uuid} 를 base prefix 로 사용
+    return this.uploadImage(
+      file,
+      'personality',
+      FilesService.PERSONALITY_IMAGE_SIZES,
+    );
+  }
+
+  async uploadJobTypeImage(
+    file: Express.Multer.File,
+  ): Promise<UploadImageResponse> {
+    return this.uploadImage(
+      file,
+      'job-type',
+      FilesService.JOB_TYPE_IMAGE_SIZES,
+    );
+  }
+
+  async uploadCardBackgroundImage(
+    file: Express.Multer.File,
+  ): Promise<UploadImageResponse> {
+    return this.uploadImage(
+      file,
+      'card-background',
+      FilesService.CARD_BACKGROUND_SIZES,
+    );
+  }
+
+  /**
+   * `{category}/{YYYY}/{mm}/{uuid}/` 하위에 원본(`origin.webp`)과 파생본을 저장하고,
+   * uuid 까지의 base URL 을 반환한다. 소비 시 `${url}/36.webp` 처럼 파일명을 붙여 접근한다.
+   */
+  private async uploadImage(
+    file: Express.Multer.File,
+    category: string,
+    sizes: ImageSize[],
+  ): Promise<UploadImageResponse> {
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const basePrefix = `personality/${yyyy}/${mm}/${randomUUID()}`;
+    const basePrefix = `${category}/${yyyy}/${mm}/${randomUUID()}`;
 
     // 원본은 리사이즈 없이 webp 로 변환해 origin.webp 로 저장
     const origin = await sharp(file.buffer).webp().toBuffer();
@@ -72,52 +81,20 @@ export class FilesService {
       ),
     ];
 
-    // 파생 사이즈: {size}.webp 로 리사이즈+크롭 후 업로드 (36x36)
-    for (const size of FilesService.PERSONALITY_IMAGE_SIZES) {
-      const resized = await this.resizeImage(file.buffer, size, size);
+    for (const { width, height } of sizes) {
+      const resized = await this.resizeImage(file.buffer, width, height);
+      const fileName =
+        width === height ? `${width}.webp` : `${width}x${height}.webp`;
       uploads.push(
         this.s3Service.uploadFile(
           resized,
-          `${basePrefix}/${size}.webp`,
+          `${basePrefix}/${fileName}`,
           'image/webp',
         ),
       );
     }
     await Promise.all(uploads);
 
-    // uuid 까지의 base URL 반환 → 소비 시 `${url}/36.webp` 처럼 접근
-    return { url: this.s3Service.getPublicUrl(basePrefix) };
-  }
-
-  async uploadCardBackgroundImage(
-    file: Express.Multer.File,
-  ): Promise<UploadImageResponse> {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const basePrefix = `card-background/${yyyy}/${mm}/${randomUUID()}`;
-
-    const { width, height } = FilesService.CARD_BACKGROUND_SIZE;
-
-    // 원본은 리사이즈 없이 webp 로 변환해 origin.webp 로 저장
-    const origin = await sharp(file.buffer).webp().toBuffer();
-    // 파생: 카드 표시용으로 리사이즈+크롭해 {width}x{height}.webp 로 저장
-    const resized = await this.resizeImage(file.buffer, width, height);
-
-    await Promise.all([
-      this.s3Service.uploadFile(
-        origin,
-        `${basePrefix}/origin.webp`,
-        'image/webp',
-      ),
-      this.s3Service.uploadFile(
-        resized,
-        `${basePrefix}/${width}x${height}.webp`,
-        'image/webp',
-      ),
-    ]);
-
-    // uuid 까지의 base URL 반환 → 소비 시 `${url}/282x400.webp` 처럼 접근
     return { url: this.s3Service.getPublicUrl(basePrefix) };
   }
 
