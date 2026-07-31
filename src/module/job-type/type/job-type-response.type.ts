@@ -8,10 +8,14 @@ export class JobTypeResponse {
   @ApiProperty()
   name: string;
 
+  @ApiProperty({ nullable: true, description: '아이콘 url' })
+  imageUrl: string | null;
+
   static fromJobType(item: JobType): JobTypeResponse {
     return {
       id: item.id,
       name: item.name,
+      imageUrl: item.imageUrl,
     };
   }
 }
