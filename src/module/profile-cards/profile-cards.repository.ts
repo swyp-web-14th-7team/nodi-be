@@ -3,11 +3,8 @@ import { PrismaService } from '@/lib/prisma/prisma.service';
 import { Prisma, User, UserProfileCard } from '@/prisma/client';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
-import { UpdateDefaultProfileCardDto } from '@/module/profile-cards/dto/update-default-profile-card.dto';
 import { FindAllPublicProfileCardsDto } from '@/module/profile-cards/dto/find-all-public-profile-cards.dto';
 import {
-  defaultProfileCardIncludeOptions,
-  type DefaultUserProfileCard,
   DisplayProfileCard,
   displayProfileCardIncludeOptions,
   listProfileCardIncludeOptions,
@@ -18,25 +15,6 @@ import { PaginationResult } from '@/common/type/pagination-result.type';
 @Injectable()
 export class ProfileCardsRepository {
   constructor(private readonly prismaService: PrismaService) {}
-
-  /** 유저의 기본(default) 카드 조회 (skills/interests/links 포함) */
-  async findDefaultProfileCard(
-    userId: string,
-  ): Promise<DefaultUserProfileCard | null> {
-    return this.prismaService.userProfileCard.findUnique({
-      where: { userId_isDefault: { userId, isDefault: true } },
-      include: defaultProfileCardIncludeOptions,
-    });
-  }
-
-  async findDefaultDisplayProfileCard(
-    userId: string,
-  ): Promise<DisplayProfileCard | null> {
-    return this.prismaService.userProfileCard.findUnique({
-      where: { userId_isDefault: { userId, isDefault: true } },
-      include: displayProfileCardIncludeOptions,
-    });
-  }
 
   async findUniqueProfileCard(
     whereOptions: Prisma.UserProfileCardWhereUniqueInput,
@@ -190,54 +168,23 @@ export class ProfileCardsRepository {
   }
 
   /**
-   * 첫 카드 = 기본(default) 카드 생성
-   * 기본 카드는 특정 목적에 종속되지 않는 원본이므로 purposeId 는 항상 1 (공개) 로 고정한다.
-   * (dto.purposeId 가 넘어와도 무시)
+   * 프로필 카드 생성
+   * - 몇 번째 카드든 동일하게 동작한다 (원본/기본 카드 개념 없음)
+   * - nickname 은 유저의 닉네임을 초기값으로 쓰고, 이후 update 로 카드별로 바꾼다
+   * - jobTypeId / purposeId 는 dto 값으로 설정 (온보딩 카드는 클라이언트가 purposeId=1 을 보낸다)
+   * - 항상 비공개(isActive=false)로 만들고, 나머지 필드는 비워둔 채 이후 update 로 채움
    */
-  async createDefaultProfileCard(
+  async createProfileCard(
     user: User,
-    dto: CreateProfileCardDto,
+    { jobTypeId, purposeId }: CreateProfileCardDto,
   ): Promise<DisplayProfileCard> {
     return this.prismaService.userProfileCard.create({
       data: {
         userId: user.id,
         nickname: user.nickname,
-        jobTypeId: dto.jobTypeId,
-        purposeId: dto.purposeId,
-        isDefault: true,
-        isActive: false,
-      },
-      include: displayProfileCardIncludeOptions,
-    });
-  }
-
-  /**
-   * 기본 카드를 seed 로 새 카드 생성
-   * - defaultCard 에서는 nickname 과 links 만 기본값으로 복사 (links 는 상황과 무관하게 유지되는 값)
-   * - jobTypeId / purposeId 는 dto 값으로 설정
-   * - 나머지 필드(description / personality / affiliation / skills / interests 등)는 비워두고 이후 update 로 채움
-   */
-  async createProfileCard(
-    user: User,
-    { jobTypeId, purposeId }: CreateProfileCardDto,
-    defaultCard: DefaultUserProfileCard,
-  ): Promise<DisplayProfileCard> {
-    return this.prismaService.userProfileCard.create({
-      data: {
-        userId: user.id,
-        nickname: defaultCard.nickname,
         jobTypeId,
         purposeId,
-        isDefault: null,
         isActive: false,
-        profileCardLinks: {
-          createMany: {
-            data: defaultCard.profileCardLinks.map((link) => ({
-              type: link.type,
-              value: link.value,
-            })),
-          },
-        },
       },
       include: displayProfileCardIncludeOptions,
     });
@@ -254,6 +201,7 @@ export class ProfileCardsRepository {
   async updateProfileCard(
     id: string,
     {
+      nickname,
       skillIds,
       interestIds,
       personalityId,
@@ -272,6 +220,7 @@ export class ProfileCardsRepository {
       where: { id },
       include: displayProfileCardIncludeOptions,
       data: {
+        nickname,
         description,
         affiliation,
         affiliationStatusId,
@@ -322,32 +271,6 @@ export class ProfileCardsRepository {
                 sortOrder,
               }),
             ),
-          },
-        }),
-      },
-    });
-  }
-
-  /**
-   * 기본(default) 카드 수정
-   * - 유저당 하나뿐인 기본 카드를 (userId, isDefault) 유니크 키로 특정해 수정
-   * - nickname: 값이 있을 때만 변경 (undefined 는 그대로)
-   * - links: 전체 교체(기존 삭제 후 재생성) — value 가 항목마다 달라 부분 병합이 아닌 통째 덮어쓰기
-   * - 기본 카드가 없으면 update 대상이 없어 P2025 가 발생한다.
-   */
-  async updateDefaultProfileCard(
-    userId: string,
-    { nickname, links }: UpdateDefaultProfileCardDto,
-  ): Promise<DisplayProfileCard> {
-    return this.prismaService.userProfileCard.update({
-      where: { userId_isDefault: { userId, isDefault: true } },
-      include: displayProfileCardIncludeOptions,
-      data: {
-        nickname,
-        ...(links !== undefined && {
-          profileCardLinks: {
-            deleteMany: {},
-            create: links.map(({ type, value }) => ({ type, value })),
           },
         }),
       },
