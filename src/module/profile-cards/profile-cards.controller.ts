@@ -17,7 +17,7 @@ import { type User } from '@/prisma/client';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
 import { ProfileCardResponse } from '@/module/profile-cards/type/profile-card-response.type';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
-import { ApiNotFoundResponse } from '@nestjs/swagger';
+import { ApiConflictResponse, ApiNotFoundResponse } from '@nestjs/swagger';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationType } from '@/common/type/pagination.type';
 import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
@@ -148,6 +148,9 @@ export class ProfileCardsController {
    * 로그인한 유저 본인이 소유한 프로필 카드를 삭제합니다.
    * 본인 소유가 아니거나 존재하지 않으면 404 를 반환합니다.
    *
+   * ★ 마지막 남은 한 장은 삭제할 수 없으며 409 를 반환합니다.
+   *   (카드가 2장 이상일 때만 삭제 가능)
+   *
    * ★ 카드에 연결된 경험/스킬/관심사/링크/스크랩은 함께 정리됩니다.
    * @param user
    * @param id
@@ -156,6 +159,9 @@ export class ProfileCardsController {
   @Auth(UserRole.ADMIN, UserRole.USER)
   @ApiResponseSuccess()
   @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
+  @ApiConflictResponse({
+    description: '마지막 프로필 카드는 삭제가 불가합니다.',
+  })
   async deleteProfileCard(
     @CurrentUser() user: User,
     @Param('id') id: string,

@@ -24,6 +24,11 @@ export class ProfileCardsRepository {
     });
   }
 
+  /** 유저가 소유한 프로필 카드 수 (공개 여부와 무관하게 전부) */
+  async countProfileCards(userId: string): Promise<number> {
+    return this.prismaService.userProfileCard.count({ where: { userId } });
+  }
+
   async findManyDisplayProfileCards(
     whereOptions: Prisma.UserProfileCardWhereInput,
     { skip, limit, sort, order }: PaginationDto,
