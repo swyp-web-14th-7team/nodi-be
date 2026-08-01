@@ -64,22 +64,61 @@ export class ProfileCardsRepository {
     return { total, items };
   }
 
-  /** 공개(활성) 프로필 카드 목록 조회 (필터: purpose/jobType/affiliationStatus, 검색: 닉네임/관심사) */
-  async findManyPublicProfileCards({
-    skip,
-    limit,
-    sort,
-    order,
-    purposeId,
-    affiliationStatusId,
-    jobTypeId,
-    skillIds,
-    keywords,
-  }: FindAllPublicProfileCardsDto): Promise<
-    PaginationResult<DisplayProfileCard>
-  > {
+  /**
+   * 내 유저가 참여한 모든 연결의 카드 ID 목록.
+   *
+   * @remarks
+   * CardConnection 의 requesterCardId / receiverCardId 는 FK 가 아닌 순수 식별자라
+   * Prisma 관계 필터(`none`)를 쓸 수 없다. 그래서 ID 를 먼저 모아 `notIn` 으로 거른다.
+   *
+   * - 보관함에서 제거된(requesterRemovedAt / receiverRemovedAt) 연결도 포함한다.
+   *   행이 남아 있는 한 `@@unique([requesterCardId, receiverCardId])` 때문에 재연결이
+   *   불가능하므로, 목록에 다시 노출하면 요청 단계에서 실패하기 때문.
+   * - 결과에 내 카드 ID 도 섞여 들어오지만, 호출부에서 userId 로 이미 내 카드를 전부
+   *   제외하므로 무해하다.
+   */
+  private async findConnectedCardIds(userId: string): Promise<string[]> {
+    const connections = await this.prismaService.cardConnection.findMany({
+      where: {
+        OR: [{ requesterUserId: userId }, { receiverUserId: userId }],
+      },
+      select: { requesterCardId: true, receiverCardId: true },
+    });
+    return connections.flatMap(({ requesterCardId, receiverCardId }) => [
+      requesterCardId,
+      receiverCardId,
+    ]);
+  }
+
+  /**
+   * 공개(활성) 프로필 카드 목록 조회 (필터: purpose/jobType/affiliationStatus, 검색: 닉네임/관심사)
+   *
+   * @param user 로그인한 유저(선택). 넘기면 내가 소유한 카드와 이미 연결된 카드를 목록에서 제외한다.
+   */
+  async findManyPublicProfileCards(
+    {
+      skip,
+      limit,
+      sort,
+      order,
+      purposeId,
+      affiliationStatusId,
+      jobTypeId,
+      skillIds,
+      keywords,
+    }: FindAllPublicProfileCardsDto,
+    user?: User,
+  ): Promise<PaginationResult<DisplayProfileCard>> {
+    const connectedCardIds = user
+      ? await this.findConnectedCardIds(user.id)
+      : [];
+
     const where: Prisma.UserProfileCardWhereInput = {
       isActive: true,
+      // 로그인 상태에서만: 내가 소유한 카드 제외
+      ...(user && { userId: { not: user.id } }),
+      // 로그인 상태에서만: 이미 연결된 카드 제외
+      ...(connectedCardIds.length > 0 && { id: { notIn: connectedCardIds } }),
       // undefined 면 필터 없음, 값이 있으면 해당 값으로 필터
       purposeId,
       affiliationStatusId,
