@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -102,11 +103,25 @@ export class ProfileCardsService {
     }
   }
 
+  /**
+   * 프로필 카드 삭제
+   *
+   * @remarks
+   * 마지막 남은 한 장은 삭제할 수 없다. 카드가 0장이 되면 유저가 연결·공개 기능을
+   * 전혀 쓸 수 없는 상태로 떨어지기 때문. 요청 자체는 유효하고 카드가 2장 이상이면
+   * 성공하므로, 400 이 아니라 상태 충돌(409)로 응답한다.
+   */
   async deleteProfileCard(user: User, id: string): Promise<void> {
     const target: UserProfileCard | null =
       await this.profileCardsRepository.findUniqueProfileCard({ id });
     if (!target || target.userId !== user.id)
       throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
+
+    const cardCount = await this.profileCardsRepository.countProfileCards(
+      user.id,
+    );
+    if (cardCount <= 1)
+      throw new ConflictException('마지막 프로필 카드는 삭제가 불가합니다.');
 
     await this.profileCardsRepository.deleteProfileCard(id);
   }
