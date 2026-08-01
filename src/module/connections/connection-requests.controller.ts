@@ -23,7 +23,7 @@ import { ApiResponseSuccess } from '@/common/decorator/api-response-success.deco
 import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
 import { PaginationType } from '@/common/type/pagination.type';
 import { CreateConnectionRequestDto } from '@/module/connections/dto/create-connection-request.dto';
-import { ConnectionRequestListQueryDto } from '@/module/connections/dto/connection-request-list.query.dto';
+import { FindAllConnectionRequestsDto } from '@/module/connections/dto/find-all-connection-requests.dto';
 import { ConnectionRequestResponse } from '@/module/connections/type/connection-request-response.type';
 
 @Controller('connection-requests')
@@ -86,7 +86,7 @@ export class ConnectionRequestsController {
   @ApiNotFoundResponse({ description: '카드를 찾을 수 없습니다.' })
   async getReceived(
     @CurrentUser() user: User,
-    @Query() query: ConnectionRequestListQueryDto,
+    @Query() query: FindAllConnectionRequestsDto,
   ): Promise<PaginationType<ConnectionRequestResponse>> {
     const { total, items } = await this.connectionRequestsService.getReceived(
       user,
@@ -118,7 +118,7 @@ export class ConnectionRequestsController {
   @ApiNotFoundResponse({ description: '카드를 찾을 수 없습니다.' })
   async getSent(
     @CurrentUser() user: User,
-    @Query() query: ConnectionRequestListQueryDto,
+    @Query() query: FindAllConnectionRequestsDto,
   ): Promise<PaginationType<ConnectionRequestResponse>> {
     const { total, items } = await this.connectionRequestsService.getSent(
       user,

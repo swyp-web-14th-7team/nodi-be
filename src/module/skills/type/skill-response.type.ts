@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { SkillWithRelations } from '@/module/skills/skill.type';
 import { SkillCategoryResponse } from '@/module/skill-categories/type/skill-category-response.type';
-import { JobTypeResponse } from '@/module/job-type/type/job-type-response.type';
+import { JobTypeResponse } from '@/module/job-types/type/job-type-response.type';
 
 export class SkillResponse {
   @ApiProperty()

@@ -3,14 +3,14 @@ import { PurposesRepository } from '@/module/purposes/purposes.repository';
 import { Purpose } from '@/prisma/client';
 import { CreatePurposeDto } from '@/module/purposes/dto/create-purpose.dto';
 import { UpdatePurposeDto } from '@/module/purposes/dto/update-purpose.dto';
-import { FindPurposeDto } from '@/module/purposes/dto/find-purpose.dto';
+import { FindAllPurposesDto } from '@/module/purposes/dto/find-all-purposes.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
 export class PurposesService {
   constructor(private readonly purposesRepository: PurposesRepository) {}
 
-  async findMany(dto: FindPurposeDto): Promise<PaginationResult<Purpose>> {
+  async findMany(dto: FindAllPurposesDto): Promise<PaginationResult<Purpose>> {
     return this.purposesRepository.findMany(dto);
   }
 

@@ -5,7 +5,7 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 
 const SKILL_SORT_FIELDS = ['id', 'name'] as const;
 
-export class FindSkillsDto extends PaginationDto {
+export class FindAllSkillsDto extends PaginationDto {
   @ApiPropertyOptional({
     description: '카테고리 ID 로 필터 (생략 시 전체 조회)',
   })

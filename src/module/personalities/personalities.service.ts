@@ -3,7 +3,7 @@ import { PersonalitiesRepository } from '@/module/personalities/personalities.re
 import { Personality } from '@/prisma/client';
 import { CreatePersonalityDto } from '@/module/personalities/dto/create-personality.dto';
 import { UpdatePersonalityDto } from '@/module/personalities/dto/update-personality.dto';
-import { FindPersonalityDto } from '@/module/personalities/dto/find-personality.dto';
+import { FindAllPersonalitiesDto } from '@/module/personalities/dto/find-all-personalities.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
@@ -13,7 +13,7 @@ export class PersonalitiesService {
   ) {}
 
   async findMany(
-    dto: FindPersonalityDto,
+    dto: FindAllPersonalitiesDto,
   ): Promise<PaginationResult<Personality>> {
     return this.personalitiesRepository.findMany(dto);
   }

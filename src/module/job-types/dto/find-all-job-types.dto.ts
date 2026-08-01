@@ -4,7 +4,7 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 
 const JOB_TYPE_SORT_FIELDS = ['id', 'name'] as const;
 
-export class FindJobTypeDto extends PaginationDto {
+export class FindAllJobTypesDto extends PaginationDto {
   @ApiPropertyOptional({ description: 'name 검색어 (부분 일치)' })
   @IsString()
   @IsOptional()

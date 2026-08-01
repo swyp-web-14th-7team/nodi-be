@@ -21,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { ApiResponseSuccess } from '@/common/decorator/api-response-success.decorator';
 import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
-import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
+import { UpdateUserDto } from '@/module/users/dto/update-user.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationType } from '@/common/type/pagination.type';
 
@@ -96,7 +96,7 @@ export class UsersController {
   })
   async updateMe(
     @CurrentUser() user: User,
-    @Body() dto: UpdateProfileDto,
+    @Body() dto: UpdateUserDto,
   ): Promise<UserResponse> {
     const newUser: User = await this.usersService.updateMyProfile(user, dto);
     return UserResponse.fromUser(newUser);

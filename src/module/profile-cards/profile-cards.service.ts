@@ -9,7 +9,7 @@ import { Prisma } from '@/prisma/client';
 import type { User, UserProfileCard } from '@/prisma/client';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
 import { UpdateDefaultProfileCardDto } from '@/module/profile-cards/dto/update-default-profile-card.dto';
-import { FindPublicProfileCardDto } from '@/module/profile-cards/dto/find-public-profile-card.dto';
+import { FindAllPublicProfileCardsDto } from '@/module/profile-cards/dto/find-all-public-profile-cards.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
@@ -54,7 +54,7 @@ export class ProfileCardsService {
 
   /** 인증 없이 공개(활성) 프로필 카드 목록 조회 (public) */
   async findAllPublicProfileCards(
-    dto: FindPublicProfileCardDto,
+    dto: FindAllPublicProfileCardsDto,
   ): Promise<PaginationResult<DisplayProfileCard>> {
     return this.profileCardsRepository.findManyPublicProfileCards(dto);
   }

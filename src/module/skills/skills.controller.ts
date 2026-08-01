@@ -15,7 +15,7 @@ import { UserRole } from '@/common/enum/user-role.enum';
 import { ApiResponseSuccess } from '@/common/decorator/api-response-success.decorator';
 import { CreateSkillDto } from '@/module/skills/dto/create-skill.dto';
 import { UpdateSkillDto } from '@/module/skills/dto/update-skill.dto';
-import { FindSkillsDto } from '@/module/skills/dto/find-skills.dto';
+import { FindAllSkillsDto } from '@/module/skills/dto/find-all-skills.dto';
 import { SkillResponse } from '@/module/skills/type/skill-response.type';
 import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
 import { PaginationType } from '@/common/type/pagination.type';
@@ -35,7 +35,7 @@ export class SkillsController {
   @Get()
   @ApiResponsePagination(SkillResponse)
   async findAll(
-    @Query() dto: FindSkillsDto,
+    @Query() dto: FindAllSkillsDto,
   ): Promise<PaginationType<SkillResponse>> {
     const { items, total } = await this.skillsService.findAll(dto);
     return {

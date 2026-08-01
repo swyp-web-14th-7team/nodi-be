@@ -3,7 +3,7 @@ import { AffiliationStatusesRepository } from '@/module/affiliation-statuses/aff
 import { AffiliationStatus } from '@/prisma/client';
 import { CreateAffiliationStatusDto } from '@/module/affiliation-statuses/dto/create-affiliation-status.dto';
 import { UpdateAffiliationStatusDto } from '@/module/affiliation-statuses/dto/update-affiliation-status.dto';
-import { FindAffiliationStatusDto } from '@/module/affiliation-statuses/dto/find-affiliation-status.dto';
+import { FindAllAffiliationStatusesDto } from '@/module/affiliation-statuses/dto/find-all-affiliation-statuses.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
@@ -13,7 +13,7 @@ export class AffiliationStatusesService {
   ) {}
 
   async findMany(
-    dto: FindAffiliationStatusDto,
+    dto: FindAllAffiliationStatusesDto,
   ): Promise<PaginationResult<AffiliationStatus>> {
     return this.affiliationStatusesRepository.findMany(dto);
   }

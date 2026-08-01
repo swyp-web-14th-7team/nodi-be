@@ -3,7 +3,7 @@ import { PrismaService } from '@/lib/prisma/prisma.service';
 import { Prisma, User } from '@/prisma/client';
 import { UserRole } from '@/common/enum/user-role.enum';
 import { LoginParams } from '@/module/users/type/login-params.type';
-import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
+import { UpdateUserDto } from '@/module/users/dto/update-user.dto';
 import {
   UserWithLastLogin,
   userWithLastLoginIncludeOptions,
@@ -55,7 +55,7 @@ export class UsersRepository {
   }
 
   /** 프로필 수정 */
-  async updateUser(id: string, dto: UpdateProfileDto): Promise<User> {
+  async updateUser(id: string, dto: UpdateUserDto): Promise<User> {
     return this.prismaService.user.update({
       where: { id },
       data: { ...dto },

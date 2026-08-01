@@ -4,7 +4,7 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 
 const PURPOSE_SORT_FIELDS = ['id', 'name', 'sortOrder'] as const;
 
-export class FindPurposeDto extends PaginationDto {
+export class FindAllPurposesDto extends PaginationDto {
   @ApiPropertyOptional({ description: 'name 검색어 (부분 일치)' })
   @IsString()
   @IsOptional()

@@ -5,7 +5,7 @@ import { ApiResponseSuccess } from '@/common/decorator/api-response-success.deco
 import { ProfileCardResponse } from '@/module/profile-cards/type/profile-card-response.type';
 import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
 import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
-import { FindPublicProfileCardDto } from '@/module/profile-cards/dto/find-public-profile-card.dto';
+import { FindAllPublicProfileCardsDto } from '@/module/profile-cards/dto/find-all-public-profile-cards.dto';
 import { PaginationType } from '@/common/type/pagination.type';
 
 @Controller('public/profile-cards')
@@ -46,7 +46,7 @@ export class PublicProfileCardsController {
   @Get()
   @ApiResponsePagination(ProfileCardResponse)
   async getPublicProfileCards(
-    @Query() dto: FindPublicProfileCardDto,
+    @Query() dto: FindAllPublicProfileCardsDto,
   ): Promise<PaginationType<ProfileCardResponse>> {
     const { total, items } =
       await this.profileCardsService.findAllPublicProfileCards(dto);

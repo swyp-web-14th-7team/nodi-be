@@ -4,7 +4,7 @@ import { Prisma, User, UserProfileCard } from '@/prisma/client';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
 import { UpdateDefaultProfileCardDto } from '@/module/profile-cards/dto/update-default-profile-card.dto';
-import { FindPublicProfileCardDto } from '@/module/profile-cards/dto/find-public-profile-card.dto';
+import { FindAllPublicProfileCardsDto } from '@/module/profile-cards/dto/find-all-public-profile-cards.dto';
 import {
   defaultProfileCardIncludeOptions,
   type DefaultUserProfileCard,
@@ -75,7 +75,9 @@ export class ProfileCardsRepository {
     jobTypeId,
     skillIds,
     keywords,
-  }: FindPublicProfileCardDto): Promise<PaginationResult<DisplayProfileCard>> {
+  }: FindAllPublicProfileCardsDto): Promise<
+    PaginationResult<DisplayProfileCard>
+  > {
     const where: Prisma.UserProfileCardWhereInput = {
       isActive: true,
       // undefined 면 필터 없음, 값이 있으면 해당 값으로 필터

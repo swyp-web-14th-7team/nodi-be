@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/lib/prisma/prisma.service';
 import { Prisma, Skill } from '@/prisma/client';
 import { SkillInclude, SkillWithRelations } from '@/module/skills/skill.type';
-import { FindSkillsDto } from '@/module/skills/dto/find-skills.dto';
+import { FindAllSkillsDto } from '@/module/skills/dto/find-all-skills.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class SkillsRepository {
     limit,
     search,
     skip,
-  }: FindSkillsDto): Promise<PaginationResult<SkillWithRelations>> {
+  }: FindAllSkillsDto): Promise<PaginationResult<SkillWithRelations>> {
     const whereOptions: Prisma.SkillWhereInput = {
       ...(categoryId ? { categoryId } : {}),
       // 스킬 하나가 여러 직군에 매핑되므로 some 으로 "해당 직군을 가진 스킬"을 찾는다

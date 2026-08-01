@@ -21,7 +21,7 @@ import { CreatePurposeDto } from '@/module/purposes/dto/create-purpose.dto';
 import { UpdatePurposeDto } from '@/module/purposes/dto/update-purpose.dto';
 import { PurposeResponse } from '@/module/purposes/type/purpose-response.type';
 import { PaginationType } from '@/common/type/pagination.type';
-import { FindPurposeDto } from '@/module/purposes/dto/find-purpose.dto';
+import { FindAllPurposesDto } from '@/module/purposes/dto/find-all-purposes.dto';
 
 @Controller('purposes')
 export class PurposesController {
@@ -38,7 +38,7 @@ export class PurposesController {
   @Get()
   @ApiResponsePagination(PurposeResponse)
   async findAll(
-    @Query() dto: FindPurposeDto,
+    @Query() dto: FindAllPurposesDto,
   ): Promise<PaginationType<PurposeResponse>> {
     const { items, total } = await this.purposesService.findMany(dto);
     return {

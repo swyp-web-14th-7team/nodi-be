@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/lib/prisma/prisma.service';
 import { Personality, Prisma } from '@/prisma/client';
-import { FindPersonalityDto } from '@/module/personalities/dto/find-personality.dto';
+import { FindAllPersonalitiesDto } from '@/module/personalities/dto/find-all-personalities.dto';
 import { CreatePersonalityDto } from '@/module/personalities/dto/create-personality.dto';
 import { UpdatePersonalityDto } from '@/module/personalities/dto/update-personality.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
@@ -11,7 +11,7 @@ export class PersonalitiesRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
   async findMany(
-    dto: FindPersonalityDto,
+    dto: FindAllPersonalitiesDto,
   ): Promise<PaginationResult<Personality>> {
     const { skip, limit, sort, order, search, jobTypeId } = dto;
     const where: Prisma.PersonalityWhereInput = {

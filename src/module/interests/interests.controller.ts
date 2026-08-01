@@ -10,7 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiNotFoundResponse } from '@nestjs/swagger';
-import { InterestsService } from '@/module/interests/Interests.service';
+import { InterestsService } from '@/module/interests/interests.service';
 import { Interest } from '@/prisma/client';
 import { ApiResponseSuccess } from '@/common/decorator/api-response-success.decorator';
 import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
@@ -20,7 +20,7 @@ import { CreateInterestDto } from '@/module/interests/dto/create-interest.dto';
 import { UpdateInterestDto } from '@/module/interests/dto/update-interest.dto';
 import { InterestResponse } from '@/module/interests/type/interest-response.type';
 import { PaginationType } from '@/common/type/pagination.type';
-import { FindInterestDto } from '@/module/interests/dto/find-interest.dto';
+import { FindAllInterestsDto } from '@/module/interests/dto/find-all-interests.dto';
 
 @Controller('interests')
 export class InterestsController {
@@ -36,7 +36,7 @@ export class InterestsController {
   @Get()
   @ApiResponsePagination(InterestResponse)
   async findAll(
-    @Query() dto: FindInterestDto,
+    @Query() dto: FindAllInterestsDto,
   ): Promise<PaginationType<InterestResponse>> {
     const { items, total } = await this.interestsService.findMany(dto);
     return {

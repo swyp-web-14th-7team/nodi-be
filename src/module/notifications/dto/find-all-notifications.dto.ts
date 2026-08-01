@@ -3,11 +3,11 @@ import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { Transform, TransformFnParams } from 'class-transformer';
 
-const NOTIFICATIONS_SORT_FIELDS = ['createdAt'] as const;
+const NOTIFICATION_SORT_FIELDS = ['createdAt'] as const;
 
 export class FindAllNotificationsDto extends PaginationDto {
   @ApiPropertyOptional()
-  @IsIn(NOTIFICATIONS_SORT_FIELDS)
+  @IsIn(NOTIFICATION_SORT_FIELDS)
   @IsOptional()
   sort: string = 'createdAt';
 
