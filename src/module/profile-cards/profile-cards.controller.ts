@@ -17,12 +17,11 @@ import { type User } from '@/prisma/client';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
 import { ProfileCardResponse } from '@/module/profile-cards/type/profile-card-response.type';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
-import { ApiBadRequestResponse, ApiNotFoundResponse } from '@nestjs/swagger';
+import { ApiNotFoundResponse } from '@nestjs/swagger';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationType } from '@/common/type/pagination.type';
 import { ApiResponsePagination } from '@/common/decorator/api-response-pagination.decorator';
 import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
-import { UpdateDefaultProfileCardDto } from '@/module/profile-cards/dto/update-default-profile-card.dto';
 
 @Controller('profile-cards')
 export class ProfileCardsController {
@@ -61,28 +60,6 @@ export class ProfileCardsController {
   }
 
   /**
-   * 기본(Default) 프로필 카드 조회
-   * @remarks
-   * 로그인한 유저 본인의 기본(Default) 카드를 조회합니다.
-   *
-   * 기본 카드는 온보딩 시 생성되는 원본 카드로, 유저당 하나만 존재합니다.
-   *
-   * 아직 카드를 생성하지 않아 기본 카드가 없으면 404 를 반환합니다.
-   * @param user
-   */
-  @Get('/default')
-  @Auth(UserRole.ADMIN, UserRole.USER)
-  @ApiResponseSuccess(ProfileCardResponse)
-  @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
-  async getDefaultProfileCard(
-    @CurrentUser() user: User,
-  ): Promise<ProfileCardResponse> {
-    const item: DisplayProfileCard =
-      await this.profileCardsService.findDefaultDisplayProfileCard(user);
-    return ProfileCardResponse.fromProfileCard(item);
-  }
-
-  /**
    * 유저 프로필 카드 단건 조회
    * @remarks
    * 로그인한 유저 본인이 소유한 프로필 카드를 id 로 조회합니다.
@@ -107,46 +84,17 @@ export class ProfileCardsController {
   }
 
   /**
-   * 기본(Default) 프로필 카드 수정
-   * @remarks
-   * 로그인한 유저 본인의 기본(Default) 카드를 수정합니다.
-   * 요청 본문의 모든 값은 Optional 하며, 넘긴 값만 반영됩니다.
-   *
-   * - nickname: 넘기면 변경, 생략하면 기존 값 유지 (1 ~ 255자)
-   * - links: 전체 교체(넘긴 목록으로 기존 링크를 통째로 덮어씀). 각 항목 type 매핑은 다음과 같습니다.
-   *   0: EMAIL, 1: INSTAGRAM, 2: GITHUB, 3: LINKEDIN, 4: BEHANCE, 5: NOTION, 6: WEBSITE
-   *
-   * ★ 기본 카드는 온보딩 시 생성되는 원본 카드로, 아직 카드가 없으면 404 를 반환합니다.
-   *   응답은 관계까지 포함한 완전한 카드(단건 조회와 동일 형태)입니다.
-   * @param user
-   * @param dto
-   */
-  @Patch('/default')
-  @Auth(UserRole.ADMIN, UserRole.USER)
-  @ApiResponseSuccess(ProfileCardResponse)
-  @ApiNotFoundResponse({ description: '기본 카드가 존재하지 않습니다.' })
-  async updateDefaultProfileCard(
-    @CurrentUser() user: User,
-    @Body() dto: UpdateDefaultProfileCardDto,
-  ): Promise<ProfileCardResponse> {
-    const data: DisplayProfileCard =
-      await this.profileCardsService.updateDefaultProfileCard(user, dto);
-    return ProfileCardResponse.fromProfileCard(data);
-  }
-
-  /**
    * 유저 프로필 카드 생성
    * @remarks
-   * 유저 프로필 카드를 생성합니다. 동작 방식은 두 가지로 나뉩니다.
+   * 유저 프로필 카드를 생성합니다. 몇 번째 카드든 동작은 동일합니다.
    *
-   * 1. 유저의 Default 프로필 카드가 없는 경우 (온보딩)
-   *    → 이 카드가 Default 카드로 생성되며, purposeId 는 요청값과 무관하게 1 (공개) 로 고정됩니다.
-   * 2. 유저의 Default 프로필 카드가 있는 경우 (추후 카드 생성 시점)
-   *    → jobTypeId / purposeId 는 요청값으로 설정되고, Default 카드에서는 nickname 과 links 만 기본값으로 복사됩니다.
-   *    → 나머지 필드는 비워둔 채 생성되며 이후 update 로 채웁니다.
+   * - jobTypeId / purposeId 는 요청값으로 설정됩니다.
+   *   (온보딩 카드는 클라이언트가 purposeId=1 을 보내면 됩니다)
+   * - nickname 은 유저 닉네임이 초기값으로 들어가며, 이후 수정으로 카드별로 바꿀 수 있습니다.
+   * - 항상 **비공개(isActive=false)** 로 생성되며, 나머지 필드는 비워둔 채 이후 update 로 채웁니다.
    *
    * ★ 응답은 관계까지 포함한 완전한 카드(단건 조회와 동일 형태)입니다.
-   *   experiences 는 전체 포함이며, 첫 카드(온보딩)는 아직 비어 있어 `[]` 로 나옵니다.
+   *   방금 만든 카드는 아직 비어 있어 experiences 가 `[]` 로 나옵니다.
    * @param user
    * @param dto
    */
@@ -200,8 +148,7 @@ export class ProfileCardsController {
    * 로그인한 유저 본인이 소유한 프로필 카드를 삭제합니다.
    * 본인 소유가 아니거나 존재하지 않으면 404 를 반환합니다.
    *
-   * ★ 기본(Default) 카드는 다른 카드 생성의 원본(seed)이므로 삭제할 수 없으며 400 을 반환합니다.
-   *   카드에 연결된 경험/스킬/관심사/링크/스크랩은 함께 정리됩니다.
+   * ★ 카드에 연결된 경험/스킬/관심사/링크/스크랩은 함께 정리됩니다.
    * @param user
    * @param id
    */
@@ -209,9 +156,6 @@ export class ProfileCardsController {
   @Auth(UserRole.ADMIN, UserRole.USER)
   @ApiResponseSuccess()
   @ApiNotFoundResponse({ description: '프로필 카드를 찾을 수 없습니다.' })
-  @ApiBadRequestResponse({
-    description: '기본 프로필 카드는 삭제할 수 없습니다.',
-  })
   async deleteProfileCard(
     @CurrentUser() user: User,
     @Param('id') id: string,

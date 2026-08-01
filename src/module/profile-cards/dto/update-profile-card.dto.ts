@@ -18,6 +18,13 @@ import { PROFILE_CARD_LINK_TYPE_DESCRIPTION } from '@/module/profile-cards/type/
 import { ProfileCardExperienceInputDto } from '@/module/profile-cards/dto/profile-card-experience-input.dto';
 
 export class UpdateProfileCardDto {
+  @ApiPropertyOptional({ description: '프로필 카드 닉네임 (1 ~ 255자)' })
+  @Length(1, 255)
+  @IsNotEmpty()
+  @IsString()
+  @IsOptional()
+  nickname?: string;
+
   @ApiPropertyOptional({ description: '스킬 ID 목록', type: [Number] })
   @IsOptional()
   @IsArray()

@@ -90,9 +90,6 @@ export class ProfileCardResponse {
   @ApiProperty()
   isActive: boolean;
 
-  @ApiProperty({ nullable: true })
-  isDefault: boolean | null;
-
   @ApiProperty()
   userId: string;
 
@@ -149,7 +146,6 @@ export class ProfileCardResponse {
       description: item.description,
       affiliation: item.affiliation,
       isActive: item.isActive,
-      isDefault: item.isDefault,
       userId: item.userId,
       createdAt: FormattedDate.fromDate(item.createdAt),
       updatedAt: FormattedDate.fromDate(item.updatedAt),

@@ -8,7 +8,6 @@ import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-
 import { Prisma } from '@/prisma/client';
 import type { User, UserProfileCard } from '@/prisma/client';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
-import { UpdateDefaultProfileCardDto } from '@/module/profile-cards/dto/update-default-profile-card.dto';
 import { FindAllPublicProfileCardsDto } from '@/module/profile-cards/dto/find-all-public-profile-cards.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
@@ -44,14 +43,6 @@ export class ProfileCardsService {
     return profileCard;
   }
 
-  async findDefaultDisplayProfileCard(user: User): Promise<DisplayProfileCard> {
-    const defaultCard: DisplayProfileCard | null =
-      await this.profileCardsRepository.findDefaultDisplayProfileCard(user.id);
-    if (!defaultCard)
-      throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
-    return defaultCard;
-  }
-
   /**
    * 공개(활성) 프로필 카드 목록 조회 (선택적 인증)
    *
@@ -75,17 +66,12 @@ export class ProfileCardsService {
     return profileCard;
   }
 
+  /** 프로필 카드 생성. 첫 카드(온보딩)든 이후 카드든 동작이 같다. */
   async createProfileCard(
     user: User,
     dto: CreateProfileCardDto,
   ): Promise<DisplayProfileCard> {
-    const defaultCard =
-      await this.profileCardsRepository.findDefaultProfileCard(user.id);
-
-    // default 카드가 있으면 그 정보를 seed 로 복사, 없으면(첫 카드) default 로 생성
-    return defaultCard
-      ? this.profileCardsRepository.createProfileCard(user, dto, defaultCard)
-      : this.profileCardsRepository.createDefaultProfileCard(user, dto);
+    return this.profileCardsRepository.createProfileCard(user, dto);
   }
 
   async updateProfileCard(
@@ -116,39 +102,11 @@ export class ProfileCardsService {
     }
   }
 
-  /**
-   * 기본(default) 카드 수정 (nickname / links 만 대상)
-   * 소유권은 update where 의 userId 로 보장되므로 별도 조회 없이 바로 수정한다.
-   * 기본 카드가 없으면 대상 미존재(P2025) → 404 로 변환한다.
-   */
-  async updateDefaultProfileCard(
-    user: User,
-    dto: UpdateDefaultProfileCardDto,
-  ): Promise<DisplayProfileCard> {
-    try {
-      return await this.profileCardsRepository.updateDefaultProfileCard(
-        user.id,
-        dto,
-      );
-    } catch (e) {
-      if (
-        e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === 'P2025'
-      )
-        throw new NotFoundException('기본 카드가 존재하지 않습니다.');
-      throw e;
-    }
-  }
-
   async deleteProfileCard(user: User, id: string): Promise<void> {
     const target: UserProfileCard | null =
       await this.profileCardsRepository.findUniqueProfileCard({ id });
     if (!target || target.userId !== user.id)
       throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
-
-    // 기본 카드는 다른 카드 생성의 원본(seed)이므로 삭제할 수 없다.
-    if (target.isDefault)
-      throw new BadRequestException('기본 프로필 카드는 삭제할 수 없습니다.');
 
     await this.profileCardsRepository.deleteProfileCard(id);
   }
