@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { UserRole } from '@/common/enum/user-role.enum';
 import { LoginParams } from '@/module/users/type/login-params.type';
 import { Prisma } from '@/prisma/client';
-import { UpdateProfileDto } from '@/module/users/dto/update-profile.dto';
+import { UpdateUserDto } from '@/module/users/dto/update-user.dto';
 import { UsersRepository } from '@/module/users/users.repository';
 import { UserWithLastLogin } from '@/module/users/users.type';
 import { PaginationDto } from '@/common/dto/pagination.dto';
@@ -27,7 +27,7 @@ export class UsersService {
     return this.usersRepository.findUniqueUser(whereOptions);
   }
 
-  async updateMyProfile(user: User, dto: UpdateProfileDto): Promise<User> {
+  async updateMyProfile(user: User, dto: UpdateUserDto): Promise<User> {
     return this.usersRepository.updateUser(user.id, dto);
   }
 

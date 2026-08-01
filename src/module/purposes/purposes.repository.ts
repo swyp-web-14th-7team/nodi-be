@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/lib/prisma/prisma.service';
 import { Purpose, Prisma } from '@/prisma/client';
-import { FindPurposeDto } from '@/module/purposes/dto/find-purpose.dto';
+import { FindAllPurposesDto } from '@/module/purposes/dto/find-all-purposes.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 import { CreatePurposeDto } from '@/module/purposes/dto/create-purpose.dto';
 import { UpdatePurposeDto } from '@/module/purposes/dto/update-purpose.dto';
@@ -10,7 +10,7 @@ import { UpdatePurposeDto } from '@/module/purposes/dto/update-purpose.dto';
 export class PurposesRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async findMany(dto: FindPurposeDto): Promise<PaginationResult<Purpose>> {
+  async findMany(dto: FindAllPurposesDto): Promise<PaginationResult<Purpose>> {
     const { skip, limit, sort, order, search } = dto;
     const where: Prisma.PurposeWhereInput = search
       ? { name: { contains: search } }

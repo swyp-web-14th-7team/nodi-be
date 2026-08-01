@@ -14,7 +14,7 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 
 const PUBLIC_PROFILE_CARD_SORT_FIELDS = ['createdAt', 'nickname'] as const;
 
-export class FindPublicProfileCardDto extends PaginationDto {
+export class FindAllPublicProfileCardsDto extends PaginationDto {
   @ApiPropertyOptional({ description: '목적 필터' })
   @Type(() => Number)
   @IsInt()

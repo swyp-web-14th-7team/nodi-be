@@ -20,7 +20,7 @@ import { CreateAffiliationStatusDto } from '@/module/affiliation-statuses/dto/cr
 import { UpdateAffiliationStatusDto } from '@/module/affiliation-statuses/dto/update-affiliation-status.dto';
 import { AffiliationStatusResponse } from '@/module/affiliation-statuses/type/affiliation-status-response.type';
 import { PaginationType } from '@/common/type/pagination.type';
-import { FindAffiliationStatusDto } from '@/module/affiliation-statuses/dto/find-affiliation-status.dto';
+import { FindAllAffiliationStatusesDto } from '@/module/affiliation-statuses/dto/find-all-affiliation-statuses.dto';
 
 @Controller('affiliation-statuses')
 export class AffiliationStatusesController {
@@ -38,7 +38,7 @@ export class AffiliationStatusesController {
   @Get()
   @ApiResponsePagination(AffiliationStatusResponse)
   async findAll(
-    @Query() dto: FindAffiliationStatusDto,
+    @Query() dto: FindAllAffiliationStatusesDto,
   ): Promise<PaginationType<AffiliationStatusResponse>> {
     const { items, total } =
       await this.affiliationStatusesService.findMany(dto);

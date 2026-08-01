@@ -3,24 +3,24 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { JobTypeRepository } from '@/module/job-type/job-type.repository';
+import { JobTypesRepository } from '@/module/job-types/job-types.repository';
 import { JobType, Prisma } from '@/prisma/client';
-import { CreateJobTypeDto } from '@/module/job-type/dto/create-job-type.dto';
-import { UpdateJobTypeDto } from '@/module/job-type/dto/update-job-type.dto';
-import { FindJobTypeDto } from '@/module/job-type/dto/find-job-type.dto';
+import { CreateJobTypeDto } from '@/module/job-types/dto/create-job-type.dto';
+import { UpdateJobTypeDto } from '@/module/job-types/dto/update-job-type.dto';
+import { FindAllJobTypesDto } from '@/module/job-types/dto/find-all-job-types.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
-export class JobTypeService {
-  constructor(private readonly jobTypeRepository: JobTypeRepository) {}
+export class JobTypesService {
+  constructor(private readonly jobTypesRepository: JobTypesRepository) {}
 
-  async findMany(dto: FindJobTypeDto): Promise<PaginationResult<JobType>> {
-    return this.jobTypeRepository.findMany(dto);
+  async findMany(dto: FindAllJobTypesDto): Promise<PaginationResult<JobType>> {
+    return this.jobTypesRepository.findMany(dto);
   }
 
   async create(dto: CreateJobTypeDto): Promise<JobType> {
     try {
-      return await this.jobTypeRepository.createJobType(dto);
+      return await this.jobTypesRepository.createJobType(dto);
     } catch (e) {
       this.handleWriteError(e);
     }
@@ -29,7 +29,7 @@ export class JobTypeService {
   async update(id: number, dto: UpdateJobTypeDto): Promise<JobType> {
     await this.findByIdOrThrow(id);
     try {
-      return await this.jobTypeRepository.updateJobType(id, dto);
+      return await this.jobTypesRepository.updateJobType(id, dto);
     } catch (e) {
       this.handleWriteError(e);
     }
@@ -37,11 +37,11 @@ export class JobTypeService {
 
   async delete(id: number): Promise<JobType> {
     await this.findByIdOrThrow(id);
-    return this.jobTypeRepository.deleteJobType(id);
+    return this.jobTypesRepository.deleteJobType(id);
   }
 
   private async findByIdOrThrow(id: number): Promise<JobType> {
-    const target: JobType | null = await this.jobTypeRepository.findUnique(id);
+    const target: JobType | null = await this.jobTypesRepository.findUnique(id);
     if (!target) throw new NotFoundException('job type 을 찾을 수 없습니다.');
     return target;
   }

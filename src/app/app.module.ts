@@ -13,7 +13,7 @@ import { SkillsModule } from '@/module/skills/skills.module';
 import { SkillCategoriesModule } from '@/module/skill-categories/skill-categories.module';
 import { InterestsModule } from '@/module/interests/interests.module';
 import { FilesModule } from '@/module/files/files.module';
-import { JobTypeModule } from '@/module/job-type/job-type.module';
+import { JobTypesModule } from '@/module/job-types/job-types.module';
 import { PersonalitiesModule } from '@/module/personalities/personalities.module';
 import { AffiliationStatusesModule } from '@/module/affiliation-statuses/affiliation-statuses.module';
 import { PurposesModule } from '@/module/purposes/purposes.module';
@@ -39,7 +39,7 @@ import { WebpageModule } from '@/module/webpage/webpage.module';
     SkillCategoriesModule,
     InterestsModule,
     FilesModule,
-    JobTypeModule,
+    JobTypesModule,
     PersonalitiesModule,
     AffiliationStatusesModule,
     PurposesModule,

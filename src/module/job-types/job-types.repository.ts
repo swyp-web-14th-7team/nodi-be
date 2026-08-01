@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/lib/prisma/prisma.service';
 import { JobType, Prisma } from '@/prisma/client';
-import { FindJobTypeDto } from '@/module/job-type/dto/find-job-type.dto';
+import { FindAllJobTypesDto } from '@/module/job-types/dto/find-all-job-types.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
-import { UpdateJobTypeDto } from '@/module/job-type/dto/update-job-type.dto';
+import { UpdateJobTypeDto } from '@/module/job-types/dto/update-job-type.dto';
 
 @Injectable()
-export class JobTypeRepository {
+export class JobTypesRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async findMany(dto: FindJobTypeDto): Promise<PaginationResult<JobType>> {
+  async findMany(dto: FindAllJobTypesDto): Promise<PaginationResult<JobType>> {
     const { skip, limit, sort, order, search } = dto;
     const where: Prisma.JobTypeWhereInput = search
       ? { name: { contains: search } }

@@ -17,7 +17,7 @@ import { Auth } from '@/common/decorator/auth.decorator';
 import { UserRole } from '@/common/enum/user-role.enum';
 import { PaginationType } from '@/common/type/pagination.type';
 import { CreateCardBackgroundImageDto } from '@/module/card-background-images/dto/create-card-background-image.dto';
-import { FindCardBackgroundImageDto } from '@/module/card-background-images/dto/find-card-background-image.dto';
+import { FindAllCardBackgroundImagesDto } from '@/module/card-background-images/dto/find-all-card-background-images.dto';
 import { CardBackgroundImageResponse } from '@/module/card-background-images/type/card-background-image-response.type';
 
 @Controller('card-background-images')
@@ -40,7 +40,7 @@ export class CardBackgroundImagesController {
   @Get()
   @ApiResponsePagination(CardBackgroundImageResponse)
   async findAll(
-    @Query() dto: FindCardBackgroundImageDto,
+    @Query() dto: FindAllCardBackgroundImagesDto,
   ): Promise<PaginationType<CardBackgroundImageResponse>> {
     const { items, total } =
       await this.cardBackgroundImagesService.findMany(dto);

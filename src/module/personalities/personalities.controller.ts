@@ -20,7 +20,7 @@ import { CreatePersonalityDto } from '@/module/personalities/dto/create-personal
 import { UpdatePersonalityDto } from '@/module/personalities/dto/update-personality.dto';
 import { PersonalityResponse } from '@/module/personalities/type/personality-response.type';
 import { PaginationType } from '@/common/type/pagination.type';
-import { FindPersonalityDto } from '@/module/personalities/dto/find-personality.dto';
+import { FindAllPersonalitiesDto } from '@/module/personalities/dto/find-all-personalities.dto';
 
 @Controller('personalities')
 export class PersonalitiesController {
@@ -36,7 +36,7 @@ export class PersonalitiesController {
   @Get()
   @ApiResponsePagination(PersonalityResponse)
   async findAll(
-    @Query() dto: FindPersonalityDto,
+    @Query() dto: FindAllPersonalitiesDto,
   ): Promise<PaginationType<PersonalityResponse>> {
     const { items, total } = await this.personalitiesService.findMany(dto);
     return {

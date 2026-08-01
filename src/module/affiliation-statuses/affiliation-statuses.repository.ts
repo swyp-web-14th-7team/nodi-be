@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/lib/prisma/prisma.service';
 import { AffiliationStatus, Prisma } from '@/prisma/client';
-import { FindAffiliationStatusDto } from '@/module/affiliation-statuses/dto/find-affiliation-status.dto';
+import { FindAllAffiliationStatusesDto } from '@/module/affiliation-statuses/dto/find-all-affiliation-statuses.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
@@ -9,7 +9,7 @@ export class AffiliationStatusesRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
   async findMany(
-    dto: FindAffiliationStatusDto,
+    dto: FindAllAffiliationStatusesDto,
   ): Promise<PaginationResult<AffiliationStatus>> {
     const { skip, limit, sort, order, search } = dto;
     const where: Prisma.AffiliationStatusWhereInput = search

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CardBackgroundImagesRepository } from '@/module/card-background-images/card-background-images.repository';
 import { CardBackgroundImage } from '@/prisma/client';
 import { CreateCardBackgroundImageDto } from '@/module/card-background-images/dto/create-card-background-image.dto';
-import { FindCardBackgroundImageDto } from '@/module/card-background-images/dto/find-card-background-image.dto';
+import { FindAllCardBackgroundImagesDto } from '@/module/card-background-images/dto/find-all-card-background-images.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 
 @Injectable()
@@ -12,7 +12,7 @@ export class CardBackgroundImagesService {
   ) {}
 
   async findMany(
-    dto: FindCardBackgroundImageDto,
+    dto: FindAllCardBackgroundImagesDto,
   ): Promise<PaginationResult<CardBackgroundImage>> {
     return this.cardBackgroundImagesRepository.findMany(dto);
   }
