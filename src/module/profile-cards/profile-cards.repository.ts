@@ -11,6 +11,7 @@ import {
 } from '@/module/profile-cards/profile-cards.type';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
+import { toProfileCardLinkUrl } from '@/module/profile-cards/type/profile-card-link-type.enum';
 
 @Injectable()
 export class ProfileCardsRepository {
@@ -260,7 +261,10 @@ export class ProfileCardsRepository {
         ...(links !== undefined && {
           profileCardLinks: {
             deleteMany: {},
-            create: links.map(({ type, value }) => ({ type, value })),
+            create: links.map(({ type, value }) => ({
+              type,
+              value: toProfileCardLinkUrl(type, value),
+            })),
           },
         }),
         // 경험은 식별자(id)가 없고 순서·내용이 자유롭게 바뀌므로 전체 교체 (links 와 동일)

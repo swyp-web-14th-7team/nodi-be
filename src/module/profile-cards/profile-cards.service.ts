@@ -6,13 +6,15 @@ import {
 } from '@nestjs/common';
 import { ProfileCardsRepository } from '@/module/profile-cards/profile-cards.repository';
 import { CreateProfileCardDto } from '@/module/profile-cards/dto/create-profile-card.dto';
-import { Prisma } from '@/prisma/client';
 import type { User, UserProfileCard } from '@/prisma/client';
+import { Prisma } from '@/prisma/client';
 import { UpdateProfileCardDto } from '@/module/profile-cards/dto/update-profile-card.dto';
 import { FindAllPublicProfileCardsDto } from '@/module/profile-cards/dto/find-all-public-profile-cards.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginationResult } from '@/common/type/pagination-result.type';
 import { DisplayProfileCard } from '@/module/profile-cards/profile-cards.type';
+import { ProfileCardLinkType } from '@/module/profile-cards/type/profile-card-link-type.enum';
+import { isEmail } from 'class-validator';
 
 @Injectable()
 export class ProfileCardsService {
@@ -84,6 +86,15 @@ export class ProfileCardsService {
       await this.profileCardsRepository.findUniqueProfileCard({ id });
     if (!target || target.userId !== user.id)
       throw new NotFoundException('프로필 카드를 찾을 수 없습니다.');
+
+    if (dto.links && dto.links.length > 0) {
+      const hasInvalidEmail = dto.links.some(
+        ({ type, value }) =>
+          type === ProfileCardLinkType.EMAIL && !isEmail(value.trim()),
+      );
+      if (hasInvalidEmail)
+        throw new BadRequestException('이메일 형식이 올바르지 않습니다.');
+    }
 
     try {
       return await this.profileCardsRepository.updateProfileCard(id, dto);
