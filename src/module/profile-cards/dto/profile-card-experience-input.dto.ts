@@ -10,6 +10,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { Transform, TransformFnParams } from 'class-transformer';
 
 export class ProfileCardExperienceInputDto {
   @ApiProperty({ description: '경험 제목', maxLength: 500 })
@@ -24,13 +25,19 @@ export class ProfileCardExperienceInputDto {
   @IsString()
   description: string;
 
-  @ApiPropertyOptional({ description: '관련 url', maxLength: 500 })
+  @ApiPropertyOptional({
+    description: '관련 url',
+    maxLength: 500,
+    nullable: true,
+  })
+  @Transform(({ value }: TransformFnParams): unknown =>
+    typeof value === 'string' && value.trim() === '' ? null : value,
+  )
   @MaxLength(500)
   @IsUrl()
-  @IsNotEmpty()
   @IsString()
   @IsOptional()
-  relatedUrl?: string;
+  relatedUrl?: string | null;
 
   @ApiProperty({
     description:
